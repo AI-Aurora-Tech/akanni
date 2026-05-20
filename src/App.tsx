@@ -12,7 +12,6 @@ import { TemplatesManager } from './components/TemplatesManager';
 import { ClientManagement } from './components/ClientManagement';
 import { Plus, Loader2, LogIn, Lock, Users, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { predictDelay } from './services/aiService';
 
 import { UserManagement } from './components/UserManagement';
 import { Settings } from './components/Settings';
@@ -38,6 +37,7 @@ const OrderBoard = () => {
   const [templates, setTemplates] = useState<FabricTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dbLoadError, setDbLoadError] = useState<string | null>(null);
   
   // Auth state
   const [email, setEmail] = useState('');
@@ -81,8 +81,9 @@ const OrderBoard = () => {
           nfeIssued: !!o.nfe_issued
         } as Order)));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching orders:", err);
+      setDbLoadError(err.message || String(err));
     }
   };
 
@@ -93,16 +94,19 @@ const OrderBoard = () => {
       if (data) {
         setStock(data.map((s: any) => ({
           id: s.id,
-          name: s.name,
-          type: s.type,
-          color: s.color,
-          quantity: s.quantity,
-          unit: s.unit,
-          minQuantity: s.min_quantity
+          name: s.name || '',
+          type: s.type || 'others',
+          color: s.color || '',
+          size: s.size || '',
+          materialFormat: s.material_format || '',
+          quantity: Number(s.quantity) || 0,
+          unit: s.unit || 'metros',
+          minQuantity: Number(s.min_quantity) || 0
         } as StockItem)));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching stock:", err);
+      setDbLoadError(err.message || String(err));
     }
   };
 
@@ -113,12 +117,21 @@ const OrderBoard = () => {
       if (data) {
         setTemplates(data.map((t: any) => ({
           id: t.id,
-          name: t.name,
-          fabricConsumption: t.fabric_consumption
+          name: t.name || '',
+          category: t.category || 'camisa',
+          fabricConsumption: Number(t.fabric_consumption) || 0,
+          buttonConsumption: Number(t.button_consumption) || 0,
+          collarConsumption: Number(t.collar_consumption) || 0,
+          size: t.size || '',
+          style: t.style || '',
+          fabricType: t.fabric_type || '',
+          collarType: t.collar_type || '',
+          color: t.color || ''
         } as FabricTemplate)));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching templates:", err);
+      setDbLoadError(err.message || String(err));
     }
   };
 
@@ -129,22 +142,23 @@ const OrderBoard = () => {
       if (data) {
         setClients(data.map((c: any) => ({
           id: c.id,
-          name: c.name,
-          taxId: c.tax_id,
-          email: c.email,
-          phone: c.phone,
-          addressCep: c.address_cep,
-          addressStreet: c.address_street,
-          addressNumber: c.address_number,
-          addressComplement: c.address_complement,
-          addressNeighborhood: c.address_neighborhood,
-          addressCity: c.address_city,
-          addressState: c.address_state,
+          name: c.name || '',
+          taxId: c.tax_id || '',
+          email: c.email || '',
+          phone: c.phone || '',
+          addressCep: c.address_cep || '',
+          addressStreet: c.address_street || '',
+          addressNumber: c.address_number || '',
+          addressComplement: c.address_complement || '',
+          addressNeighborhood: c.address_neighborhood || '',
+          addressCity: c.address_city || '',
+          addressState: c.address_state || '',
           createdAt: c.created_at
         } as Client)));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching clients:", err);
+      setDbLoadError(err.message || String(err));
     }
   };
 
@@ -198,6 +212,15 @@ const OrderBoard = () => {
     const loginId = isPedro ? 'pedro_santos@akanni.com' : (trimmedInput.includes('@') ? trimmedInput.toLowerCase() : trimmedInput);
     (window as any)._lastLoginId = loginId;
 
+    const masterEmails = [
+      'ai.auroratech@gmail.com',
+      'pedro_santos@akanni.com',
+      'pedrohenrique0806@gmail.com',
+      'pedro@akanni.com'
+    ];
+    
+    const isMaster = isPedro || masterEmails.includes(loginId.toLowerCase()) || masterEmails.includes(trimmedInput.toLowerCase());
+
     try {
       // 1. Direct Database Check (The "Simple Auth" the user asked for)
       const { data: userDoc, error: dbError } = await supabase
@@ -206,13 +229,17 @@ const OrderBoard = () => {
         .or(`id.eq."${loginId}",email.eq."${loginId}",username.eq."${trimmedInput}"`)
         .single();
 
-      // Bootstrap for Pedro Santos if DB is empty
-      if (isPedro && !userDoc && (finalPassword === 'Admin123' || finalPassword === 'adminakanni')) {
+      // Bootstrap master users if they are not in the DB yet
+      if (isMaster && !userDoc) {
+        const bootstrapEmail = isPedro ? 'pedro_santos@akanni.com' : (loginId.includes('@') ? loginId.toLowerCase() : `${loginId}@akanni.com`);
+        const username = bootstrapEmail.split('@')[0];
+        const displayName = isPedro ? 'Pedro Santos' : (username.charAt(0).toUpperCase() + username.slice(1).replace(/[-_.]/g, ' '));
+        
         const adminProfile = {
-          id: 'pedro_santos@akanni.com',
+          id: bootstrapEmail,
           uid: 'manual_admin_' + Date.now(),
-          displayName: 'Pedro Santos',
-          email: 'pedro_santos@akanni.com',
+          displayName: displayName,
+          email: bootstrapEmail,
           role: 'super_admin'
         };
         
@@ -221,7 +248,7 @@ const OrderBoard = () => {
           id: adminProfile.id,
           uid: adminProfile.uid,
           email: adminProfile.email,
-          username: 'pedro_santos',
+          username: username,
           display_name: adminProfile.displayName,
           role: adminProfile.role,
           temp_password: finalPassword
@@ -233,7 +260,7 @@ const OrderBoard = () => {
 
       if (userDoc) {
         // Simple password check against metadata table
-        if (userDoc.temp_password === finalPassword || (isPedro && (finalPassword === 'Admin123' || finalPassword === 'adminakanni'))) {
+        if (userDoc.temp_password === finalPassword || (isMaster && (finalPassword === 'Admin123' || finalPassword === 'adminakanni'))) {
           const manualProfile = {
             id: userDoc.id,
             uid: userDoc.uid || ('manual_' + userDoc.id),
@@ -325,10 +352,33 @@ const OrderBoard = () => {
     }
   };
 
-  const handleCreateTemplate = async (name: string, consumption: number) => {
+  const handleCreateTemplate = async (
+    name: string, 
+    fabricConsumption: number, 
+    buttonConsumption: number = 0, 
+    collarConsumption: number = 0,
+    category?: 'camisa' | 'gola' | 'botao',
+    size?: string,
+    style?: string,
+    fabricType?: string,
+    collarType?: string,
+    color?: string
+  ) => {
     try {
-      const { error } = await supabase.from('templates').insert({ name, fabric_consumption: consumption });
+      const { error } = await supabase.from('templates').insert({ 
+        name, 
+        fabric_consumption: fabricConsumption,
+        button_consumption: buttonConsumption,
+        collar_consumption: collarConsumption,
+        category: category || 'camisa',
+        size: size || '',
+        style: style || '',
+        fabric_type: fabricType || '',
+        collar_type: collarType || '',
+        color: color || ''
+      });
       if (error) throw error;
+      fetchTemplates();
     } catch (err: any) {
       console.error("Error creating template:", err);
       alert("Erro ao criar modelo: " + (err.message || "Tente novamente."));
@@ -340,6 +390,7 @@ const OrderBoard = () => {
     try {
       const { error } = await supabase.from('templates').delete().eq('id', id);
       if (error) throw error;
+      fetchTemplates();
     } catch (err: any) {
       console.error("Error deleting template:", err);
       alert("Erro ao excluir modelo: " + (err.message || "Tente novamente."));
@@ -464,6 +515,8 @@ const OrderBoard = () => {
         name: data.name,
         type: data.type,
         color: data.color,
+        size: data.size,
+        material_format: data.materialFormat,
         quantity: data.quantity,
         unit: data.unit,
         min_quantity: data.minQuantity
@@ -482,6 +535,8 @@ const OrderBoard = () => {
         name: data.name,
         type: data.type,
         color: data.color,
+        size: data.size,
+        material_format: data.materialFormat,
         quantity: data.quantity,
         unit: data.unit,
         min_quantity: data.minQuantity
@@ -671,6 +726,28 @@ const OrderBoard = () => {
 
   return (
     <DashboardLayout activeTab={activeTab} setActiveTab={setActiveTab}>
+      {dbLoadError && (
+        <div className="mb-6 p-5 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl flex items-start gap-3 shadow-sm max-w-4xl">
+          <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
+          <div className="flex-1 text-xs md:text-sm">
+            <h4 className="font-bold mb-1 text-amber-800">Apenas visualizando dados locais ou banco limitado</h4>
+            <p className="text-zinc-600 leading-relaxed">
+              O sistema não pôde carregar alguns dados em tempo real do Supabase: <strong className="font-mono text-xs text-red-600">"{dbLoadError}"</strong>. 
+              Isso ocorre porque o Row Level Security (RLS) está ativado no seu banco de dados, mas o login por e-mail está inativo ou as permissões para o acesso público (anon) não foram iniciadas.
+            </p>
+            <p className="text-zinc-600 mt-2 leading-relaxed">
+              👉 <strong>Como Corrigir Rapidamente:</strong> Abra o arquivo <code className="bg-amber-100/80 px-1.5 py-0.5 rounded font-mono text-xs">supabase_schema.sql</code> no seu projeto, copie a seção atualizada de <strong>Policies</strong> e execute-a no editor de SQL do painel do Supabase para configurar as políticas públicas.
+            </p>
+          </div>
+          <button 
+            onClick={() => setDbLoadError(null)}
+            className="text-amber-500 hover:text-amber-800 font-bold text-xs uppercase px-2 py-1 rounded hover:bg-amber-100/50 transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      )}
+
       {activeTab === 'dashboard' && (
         <StatsOverview orders={orders} stock={stock} />
       )}
@@ -694,7 +771,7 @@ const OrderBoard = () => {
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="flex overflow-x-auto gap-4 md:gap-6 pb-6 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
               {columns.map(col => (
-                <div key={col.status} className="flex flex-col min-w-[280px] md:min-w-[320px] lg:flex-1 shrink-0">
+                <div key={col.status} className="flex flex-col min-w-[250px] md:min-w-[280px] lg:min-w-[200px] xl:min-w-[240px] lg:flex-1 shrink-0">
                   <div className="flex items-center justify-between mb-4 px-2">
                     <div className="flex items-center space-x-2">
                       <div className={`w-2 h-2 rounded-full ${STATUS_CONFIG[col.status].color}`} />
@@ -786,6 +863,7 @@ const OrderBoard = () => {
             setEditingOrder(null);
           }} 
           onSubmit={handleCreateOrder} 
+          onDeleteOrder={handleDeleteOrder}
         />
       )}
 

@@ -18,7 +18,15 @@ CREATE TABLE IF NOT EXISTS public.users (
 CREATE TABLE IF NOT EXISTS public.templates (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
-  fabric_consumption NUMERIC NOT NULL,
+  fabric_consumption NUMERIC NOT NULL DEFAULT 0,
+  button_consumption NUMERIC DEFAULT 0,
+  collar_consumption NUMERIC DEFAULT 0,
+  category TEXT DEFAULT 'camisa', -- 'camisa', 'gola', 'botao'
+  size TEXT,
+  style TEXT,
+  fabric_type TEXT,
+  collar_type TEXT,
+  color TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -28,6 +36,8 @@ CREATE TABLE IF NOT EXISTS public.stock (
   name TEXT NOT NULL,
   type TEXT NOT NULL, -- fabric, buttons, thread, label, others
   color TEXT,
+  size TEXT,
+  material_format TEXT,
   quantity NUMERIC NOT NULL DEFAULT 0,
   unit TEXT NOT NULL, -- meters, units, kg
   min_quantity NUMERIC DEFAULT 0,
@@ -79,11 +89,11 @@ ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 
 -- Policies (Simplified for Initial Setup)
-CREATE POLICY "Allow all to authenticated" ON public.users FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all to authenticated" ON public.templates FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all to authenticated" ON public.stock FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all to authenticated" ON public.orders FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all to authenticated" ON public.clients FOR ALL TO authenticated USING (true);
+CREATE POLICY "Allow all to open public" ON public.users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all to open public" ON public.templates FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all to open public" ON public.stock FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all to open public" ON public.orders FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all to open public" ON public.clients FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- Functions for auto-updating updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()

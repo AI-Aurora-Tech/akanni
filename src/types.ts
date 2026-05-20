@@ -24,6 +24,10 @@ export interface OrderItem {
   fabricColor: string;
   fabricUsagePerUnit: number;
   totalFabricEstimate: number;
+  collarType?: string;
+  color?: string;
+  collarTemplateId?: string;
+  buttonTemplateId?: string;
 }
 
 export interface Order {
@@ -46,15 +50,17 @@ export interface Order {
   nfeIssued: boolean;
 }
 
-export type StockType = 'fabric' | 'buttons' | 'thread' | 'label' | 'others';
+export type StockType = 'fabric' | 'buttons' | 'collar' | 'thread' | 'label' | 'others';
 
 export interface StockItem {
   id: string;
   name: string;
   type: StockType;
   color?: string;
+  size?: string;
+  materialFormat?: string;
   quantity: number;
-  unit: 'meters' | 'units' | 'kg';
+  unit: 'metros' | 'unidades' | 'kg';
   minQuantity: number;
 }
 
@@ -73,5 +79,13 @@ export interface UserProfile {
 export interface FabricTemplate {
   id: string;
   name: string;
+  category?: 'camisa' | 'gola' | 'botao';
   fabricConsumption: number;
+  buttonConsumption: number;
+  collarConsumption: number;
+  size?: string;
+  style?: string;
+  fabricType?: string;
+  collarType?: string;
+  color?: string;
 }

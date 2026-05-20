@@ -5,6 +5,7 @@ import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion } from 'motion/react';
 import { STATUS_CONFIG } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
 
 interface KanbanCardProps {
   order: Order;
@@ -15,6 +16,24 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, onIssueNfe, onEdit, onDelete }) => {
+  const { profile } = useAuth();
+  const canManageOrders = profile?.role === 'super_admin' || 
+                          profile?.role === 'admin_geral' || 
+                          profile?.role === 'gestor_geral' || 
+                          profile?.role === 'gerente_producao' || 
+                          profile?.role === 'funcionario_padrao';
+
+  const lastTapRef = React.useRef<number>(0);
+
+  const handleDoubleTapAndClick = (e: React.MouseEvent | React.TouchEvent) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      onEdit(order);
+    }
+    lastTapRef.current = now;
+  };
+
   const statuses: OrderStatus[] = ['pending', 'cutting', 'sewing', 'finishing', 'delivered'];
   const currentIndex = statuses.indexOf(order.status);
 
@@ -49,12 +68,13 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
   return (
     <motion.div
       layoutId={order.id}
+      onClick={handleDoubleTapAndClick}
       className={`bg-white rounded-2xl border-l-[6px] shadow-sm hover:shadow-xl transition-all cursor-pointer group flex flex-col overflow-hidden ${
         delayInStatus > 0 ? 'border-red-500 ring-1 ring-red-100' : 'border-zinc-900 border-opacity-20'
       }`}
     >
       {order.designImages && order.designImages.length > 0 && (
-        <div className="h-32 w-full overflow-hidden bg-zinc-50 border-b border-zinc-100 relative flex group">
+        <div className="h-20 sm:h-32 w-full overflow-hidden bg-zinc-50 border-b border-zinc-100 relative flex group">
           {order.designImages.length === 1 ? (
             <img 
               src={order.designImages[0]} 
@@ -99,24 +119,28 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
               </p>
             )}
           </div>
-          <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-            <button 
-              onClick={() => onEdit(order)}
-              className="p-1.5 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-900 rounded-lg transition-colors"
-            >
-              <Edit2 size={12} />
-            </button>
-            <button 
-              onClick={() => {
-                if (confirm('Deseja realmente excluir este pedido?')) {
-                  onDelete(order.id);
-                }
-              }}
-              className="p-1.5 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded-lg transition-colors"
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
+          {canManageOrders && (
+            <div className="flex space-x-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+              <button 
+                onClick={() => onEdit(order)}
+                className="p-2 bg-zinc-100/85 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-950 rounded-xl transition-all flex items-center justify-center border border-zinc-200/50 shadow-sm"
+                title="Editar Pedido"
+              >
+                <Edit2 size={14} className="stroke-[2.5]" />
+              </button>
+              <button 
+                onClick={() => {
+                  if (confirm('Deseja realmente excluir este pedido?')) {
+                    onDelete(order.id);
+                  }
+                }}
+                className="p-2 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 rounded-xl transition-all flex items-center justify-center border border-red-100/50 shadow-sm"
+                title="Excluir Pedido"
+              >
+                <Trash2 size={14} className="stroke-[2.5]" />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="space-y-1.5 mb-4">

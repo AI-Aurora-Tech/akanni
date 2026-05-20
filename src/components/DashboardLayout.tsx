@@ -53,10 +53,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
 
   const menuItems = [
     { id: 'dashboard', label: 'Painel Geral', icon: <LayoutDashboard size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral'] },
-    { id: 'orders', label: 'Produção (Kanban)', icon: <ShoppingBag size={20} />, roles: ['super_admin', 'admin_geral', 'gerente_producao', 'funcionario_padrao'] },
-    { id: 'clients', label: 'Clientes', icon: <Users size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral'] },
-    { id: 'templates', label: 'Modelos de Gasto', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'funcionario_padrao'] },
-    { id: 'inventory', label: 'Estoque de Tecidos', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'funcionario_padrao'] },
+    { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
+    { id: 'clients', label: 'Clientes', icon: <Users size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
+    { id: 'templates', label: 'Modelos de Gasto', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
+    { id: 'inventory', label: 'Estoque de Tecidos', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
     { id: 'users', label: 'Usuários', icon: <Users size={20} />, roles: ['super_admin'] },
     { id: 'settings', label: 'Minha Conta', icon: <Settings size={20} />, roles: ['super_admin', 'admin_geral', 'gerente_producao', 'gestor_geral', 'funcionario_padrao'] },
   ];
@@ -117,10 +117,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-semibold truncate text-zinc-900">{profile?.displayName || 'USUÁRIO'}</p>
               <p className="text-[10px] text-zinc-400 font-mono truncate uppercase tracking-widest">
-                {profile?.role === 'super_admin' ? 'Administrador' : 
-                 profile?.role === 'admin_geral' ? 'Gerente Geral' :
-                 profile?.role === 'gerente_producao' ? 'Produção' :
-                 profile?.role === 'gestor_geral' ? 'Gestor' : 'Equipe'}
+                {profile?.role === 'super_admin' ? 'Super Admin' : 
+                 profile?.role === 'admin_geral' ? 'Admin Geral' :
+                 profile?.role === 'gerente_producao' ? 'Gerente de Produção' :
+                 profile?.role === 'funcionario_padrao' ? 'Funcionário Padrão' : 
+                 profile?.role === 'gestor_geral' ? 'Gestor Geral' : 'Usuário'}
               </p>
             </div>
           </div>
