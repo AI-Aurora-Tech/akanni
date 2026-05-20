@@ -344,7 +344,7 @@ export const ClientManagement = () => {
                       <input 
                         required
                         type="text" 
-                        className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-zinc-900 focus:border-zinc-900"
+                        className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none transition-all text-sm"
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
                       />
@@ -354,7 +354,7 @@ export const ClientManagement = () => {
                       <input 
                         type="text" 
                         placeholder="000.000.000-00"
-                        className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all font-mono text-sm"
+                        className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none h-12 transition-all font-mono text-sm"
                         value={formData.taxId}
                         onChange={(e) => setFormData({...formData, taxId: formatTaxId(e.target.value)})}
                       />
@@ -363,7 +363,7 @@ export const ClientManagement = () => {
                       <label className="block text-sm font-medium text-zinc-700 mb-1.5">E-mail</label>
                       <input 
                         type="email" 
-                        className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-zinc-900 focus:border-zinc-900"
+                        className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none transition-all text-sm"
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                       />
@@ -372,7 +372,7 @@ export const ClientManagement = () => {
                       <label className="block text-sm font-medium text-zinc-700 mb-1.5">Telefone</label>
                       <input 
                         type="tel" 
-                        className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-zinc-900 focus:border-zinc-900"
+                        className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none transition-all text-sm"
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
                       />
@@ -391,7 +391,7 @@ export const ClientManagement = () => {
                         <input 
                           type="text" 
                           placeholder="00000-000"
-                          className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all font-mono"
+                          className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none h-12 transition-all font-mono text-sm"
                           value={formData.addressCep}
                           onBlur={handleCepBlur}
                           onChange={(e) => setFormData({...formData, addressCep: e.target.value})}
@@ -405,7 +405,7 @@ export const ClientManagement = () => {
                         <input 
                           type="text" 
                           placeholder="Rua, Avenida..."
-                          className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all"
+                          className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none h-12 transition-all text-sm"
                           value={formData.addressStreet}
                           onChange={(e) => setFormData({...formData, addressStreet: e.target.value})}
                         />
@@ -415,7 +415,7 @@ export const ClientManagement = () => {
                         <input 
                           type="text" 
                           placeholder="Nº"
-                          className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all"
+                          className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none h-12 transition-all text-sm"
                           value={formData.addressNumber}
                           onChange={(e) => setFormData({...formData, addressNumber: e.target.value})}
                         />
@@ -425,7 +425,7 @@ export const ClientManagement = () => {
                         <input 
                           type="text" 
                           placeholder="Sala, Apto, Bloco..."
-                          className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all"
+                          className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none h-12 transition-all text-sm"
                           value={formData.addressComplement}
                           onChange={(e) => setFormData({...formData, addressComplement: e.target.value})}
                         />
@@ -434,7 +434,7 @@ export const ClientManagement = () => {
                         <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1.5 ml-1 tracking-widest">Bairro</label>
                         <input 
                           type="text" 
-                          className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all"
+                          className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none h-12 transition-all text-sm"
                           value={formData.addressNeighborhood}
                           onChange={(e) => setFormData({...formData, addressNeighborhood: e.target.value})}
                         />
@@ -443,7 +443,7 @@ export const ClientManagement = () => {
                         <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1.5 ml-1 tracking-widest">Cidade</label>
                         <input 
                           type="text" 
-                          className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all"
+                          className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 outline-none h-12 transition-all text-sm"
                           value={formData.addressCity}
                           onChange={(e) => setFormData({...formData, addressCity: e.target.value})}
                         />
@@ -453,7 +453,7 @@ export const ClientManagement = () => {
                         <input 
                           type="text" 
                           maxLength={2}
-                          className="w-full bg-zinc-50 border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all uppercase text-center"
+                          className="w-full px-4 h-12 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 focus:border-zinc-900 h-12 transition-all uppercase text-center text-sm outline-none"
                           value={formData.addressState}
                           onChange={(e) => setFormData({...formData, addressState: e.target.value.toUpperCase()})}
                         />

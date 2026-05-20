@@ -428,24 +428,49 @@ const OrderBoard = () => {
 
       // Auto-register client if not exists
       if (orderData.customerName) {
-        const { data: existingClient } = await supabase
-          .from('clients')
-          .select('id')
-          .or(`name.eq."${orderData.customerName}",tax_id.eq."${orderData.customerTaxId}"`)
-          .maybeSingle();
+        let existingClient = null;
+        const cleanName = orderData.customerName.trim();
+        
+        try {
+          // Check by exact name match first
+          const { data: dataByName } = await supabase
+            .from('clients')
+            .select('id')
+            .eq('name', cleanName)
+            .maybeSingle();
+          
+          existingClient = dataByName;
+
+          if (!existingClient && orderData.customerTaxId && orderData.customerTaxId.trim() !== '') {
+            const cleanTax = orderData.customerTaxId.trim();
+            const { data: dataByTax } = await supabase
+              .from('clients')
+              .select('id')
+              .eq('tax_id', cleanTax)
+              .maybeSingle();
+            existingClient = dataByTax;
+          }
+        } catch (err) {
+          console.warn("[App] Error checking existing client:", err);
+        }
         
         if (!existingClient) {
-          console.log("[Client] Auto-registering new client:", orderData.customerName);
-          // Parse address if possible or just store basic info
-          // Since we already matched the address format in OrderForm, we could potentially deconstruct it
-          // But for now, we just save the name/taxId/email for future use
-          await supabase.from('clients').insert({
-              name: orderData.customerName,
-              tax_id: orderData.customerTaxId,
-              email: orderData.customerEmail,
-              // Address is already in customer_address as a string in orderData
-          });
-          fetchClients();
+          console.log("[Client] Auto-registering new client:", cleanName);
+          const newClientPayload = {
+            name: cleanName,
+            tax_id: orderData.customerTaxId ? orderData.customerTaxId.trim() : null,
+            email: orderData.customerEmail ? orderData.customerEmail.trim() : null,
+            phone: (orderData as any).customerPhone ? (orderData as any).customerPhone.trim() : null,
+            address_street: orderData.customerAddress ? orderData.customerAddress.trim() : null
+          };
+          
+          const { error: insertErr } = await supabase.from('clients').insert(newClientPayload);
+          if (insertErr) {
+            console.error("[Client] Auto-register error:", insertErr);
+          } else {
+            console.log("[Client] Auto-register successful!");
+            fetchClients();
+          }
         }
       }
 

@@ -26,27 +26,44 @@ export const Settings = () => {
     setLoading(true);
     setMessage(null);
     try {
-      // 1. Try standard Supabase Auth update
-      const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
-      
-      if (authError) {
-        // If session is missing OR user is unconfirmed, try manual update on users table
-        if (authError.message.includes('session missing') || authError.message.includes('Email not confirmed') || authError.message.includes('logins are disabled')) {
-          const identifier = user?.email || (window as any)._lastLoginId; 
-          
-          if (identifier) {
-            console.log("[Settings] Attempting manual password update for:", identifier);
-            const { error: dbError } = await supabase
-              .from('users')
-              .update({ temp_password: newPassword })
-              .or(`email.eq."${identifier}",id.eq."${identifier}"`);
-            
-            if (dbError) throw dbError;
-          } else {
+      // Get identifying details
+      const identifier = user?.email || (window as any)._lastLoginId;
+
+      // 1. Try standard Supabase Auth update first
+      let authErrorOccurred = false;
+      try {
+        const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+        if (authError) {
+          console.warn("[Settings] Supabase auth.updateUser returned error:", authError.message);
+          authErrorOccurred = true;
+          // If it is another fatal error besides session/verification issues, throw it
+          if (!authError.message.includes('session missing') && 
+              !authError.message.includes('Email not confirmed') && 
+              !authError.message.includes('logins are disabled')) {
             throw authError;
           }
-        } else {
-          throw authError;
+        }
+      } catch (authCatchErr) {
+        console.warn("[Settings] Supabase auth.updateUser exception:", authCatchErr);
+        authErrorOccurred = true;
+      }
+
+      // 2. Clear sync: ALWAYS update the users table's temp_password field so manual/simple auth can match it on logout/login!
+      if (identifier) {
+        console.log("[Settings] Syncing new password to 'users' table for:", identifier);
+        const { error: dbError } = await supabase
+          .from('users')
+          .update({ temp_password: newPassword })
+          .or(`email.eq."${identifier}",id.eq."${identifier}"`);
+        
+        if (dbError) {
+          console.error("[Settings] users table update error:", dbError);
+          // If standard auth succeeded but DB failed, or vice versa, we want the user to know
+          throw dbError;
+        }
+      } else {
+        if (authErrorOccurred) {
+          throw new Error("Não foi possível identificar o usuário atual ou atualizar a senha.");
         }
       }
 
