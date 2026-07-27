@@ -7,7 +7,7 @@ import { StatsOverview } from './components/StatsOverview';
 import { KanbanCard } from './components/KanbanCard';
 import { InventoryList } from './components/InventoryList';
 import { OrderForm } from './components/OrderForm';
-import { NfePopup } from './components/NfePopup';
+
 import { TemplatesManager } from './components/TemplatesManager';
 import { ClientManagement } from './components/ClientManagement';
 import { Plus, Loader2, LogIn, Lock, Users, Eye, EyeOff, AlertTriangle } from 'lucide-react';
@@ -49,6 +49,7 @@ const OrderBoard = () => {
   const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [nfeOrder, setNfeOrder] = useState<Order | null>(null);
+  const [notasFiscais, setNotasFiscais] = useState<Record<string, any>>({});
 
   const fetchOrders = async () => {
     try {
@@ -132,6 +133,22 @@ const OrderBoard = () => {
     } catch (err: any) {
       console.error("Error fetching templates:", err);
       setDbLoadError(err.message || String(err));
+    }
+  };
+
+  
+  const fetchNotasFiscais = async () => {
+    try {
+      const { data, error } = await supabase.from('notas_fiscais').select('*');
+      if (!error && data) {
+        const nfMap = {};
+        data.forEach(nf => {
+          nfMap[nf.pedido_id] = nf;
+        });
+        setNotasFiscais(nfMap);
+      }
+    } catch (err) {
+      console.error("Error fetching NFes:", err);
     }
   };
 
@@ -397,21 +414,32 @@ const OrderBoard = () => {
     }
   };
 
+  
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
       const { error } = await supabase.from('orders').update({ 
         status: newStatus,
         status_started_at: new Date().toISOString()
       }).eq('id', orderId);
+      
       if (error) throw error;
       fetchOrders();
+
+      // Automático: emitir NF-e se mudar para 'delivered'
+      if (newStatus === 'delivered' && !notasFiscais[orderId]) {
+        fetch('/api/nfe/emit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId })
+        }).then(() => fetchNotasFiscais()).catch(console.error);
+      }
+
     } catch (err: any) {
       console.error("Error changing status:", err);
       alert("Erro ao mudar status: " + (err.message || "Tente novamente."));
     }
   };
-
-  const handleDragEnd = (result: DropResult) => {
+const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const { draggableId, destination } = result;
     const newStatus = destination.droppableId as OrderStatus;
@@ -830,6 +858,7 @@ const OrderBoard = () => {
                                   onIssueNfe={setNfeOrder}
                                   onEdit={handleEditOrder}
                                   onDelete={handleDeleteOrder}
+                                  nfeInfo={notasFiscais[order.id]}
                                 />
                               </div>
                             )}
@@ -892,15 +921,7 @@ const OrderBoard = () => {
         />
       )}
 
-      <AnimatePresence>
-        {nfeOrder && (
-          <NfePopup 
-            order={nfeOrder} 
-            onClose={() => setNfeOrder(null)} 
-            onSuccess={handleNfeSuccess}
-          />
-        )}
-      </AnimatePresence>
+      
     </DashboardLayout>
   );
 };

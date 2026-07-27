@@ -250,7 +250,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                   <div>
                     <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1">Selecionar Cliente</label>
                     <select
-                      className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
+                      className="w-full px-5 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
                       value={selectedClientId}
                       onChange={e => setSelectedClientId(e.target.value)}
                     >
@@ -268,7 +268,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                         type="text"
                         required
                         placeholder="Nome para cadastro"
-                        className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
+                        className="w-full px-5 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
                         value={customerInfo.customerName}
                         onChange={e => setCustomerInfo({ ...customerInfo, customerName: e.target.value })}
                       />
@@ -278,7 +278,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                       <input
                         type="text"
                         placeholder="00.000.000/0000-00"
-                        className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
+                        className="w-full px-5 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
                         value={customerInfo.customerTaxId}
                         onChange={e => setCustomerInfo({ ...customerInfo, customerTaxId: e.target.value })}
                       />
@@ -292,7 +292,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                       <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1">E-mail</label>
                       <input
                         type="email"
-                        className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
+                        className="w-full px-5 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
                         value={customerInfo.customerEmail}
                         onChange={e => setCustomerInfo({ ...customerInfo, customerEmail: e.target.value })}
                       />
@@ -303,7 +303,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                       <input
                         type="tel"
                         placeholder="(00) 00000-0000"
-                        className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
+                        className="w-full px-5 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all text-sm"
                         value={customerInfo.customerPhone}
                         onChange={e => setCustomerInfo({ ...customerInfo, customerPhone: e.target.value })}
                       />
@@ -375,7 +375,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                     <input
                       type="date"
                       required
-                      className="w-full px-4 py-2 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
+                      className="w-full px-5 py-3 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-zinc-900 outline-none transition-all"
                       value={customerInfo.deliveryDate}
                       onChange={e => setCustomerInfo({ ...customerInfo, deliveryDate: e.target.value })}
                     />
