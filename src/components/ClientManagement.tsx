@@ -268,10 +268,15 @@ export const ClientManagement = () => {
                 </div>
                 <div className="flex-1 min-w-0 pr-16">
                   <h3 className="font-bold text-zinc-900 truncate leading-tight mb-1">{client.name}</h3>
+                  
                   <div className="flex items-center text-xs font-mono text-zinc-400 tracking-wider">
                     <FileText size={12} className="mr-1" />
                     {client.taxId || 'SEM CNPJ/CPF'}
+                    <span className="ml-3 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-widest uppercase bg-zinc-100 text-zinc-600">
+                      {client.source === 'Data Crazy' ? 'Data Crazy' : 'Manual'}
+                    </span>
                   </div>
+
                 </div>
               </div>
 

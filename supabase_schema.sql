@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
   address_neighborhood TEXT,
   address_city TEXT,
   address_state TEXT,
+  source TEXT DEFAULT 'manual',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

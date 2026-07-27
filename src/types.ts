@@ -11,6 +11,7 @@ export interface Client {
   addressNeighborhood?: string;
   addressCity?: string;
   addressState?: string;
+  source?: string;
   createdAt: string;
 }
 

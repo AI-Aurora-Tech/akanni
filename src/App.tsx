@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DashboardLayout } from './components/DashboardLayout';
 import { StatsOverview } from './components/StatsOverview';
 import { KanbanCard } from './components/KanbanCard';
+import { NfeModal } from './components/NfeModal';
 import { InventoryList } from './components/InventoryList';
 import { OrderForm } from './components/OrderForm';
 
@@ -170,6 +171,7 @@ const OrderBoard = () => {
           addressNeighborhood: c.address_neighborhood || '',
           addressCity: c.address_city || '',
           addressState: c.address_state || '',
+          source: c.source || 'manual',
           createdAt: c.created_at
         } as Client)));
       }
@@ -547,6 +549,24 @@ const handleDragEnd = (result: DropResult) => {
     }
   };
 
+  
+  const handleConfirmEmitNfe = async (orderId: string) => {
+    try {
+      const response = await fetch('/api/nfe/emit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId })
+      });
+      if (!response.ok) {
+        throw new Error('Falha ao solicitar emissão. Tente novamente.');
+      }
+      alert('Emissão solicitada com sucesso! Acompanhe o status.');
+      fetchNotasFiscais();
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
   const handleDeleteOrder = async (id: string) => {
     try {
       const { error } = await supabase.from('orders').delete().eq('id', id);
@@ -859,6 +879,7 @@ const handleDragEnd = (result: DropResult) => {
                                   onEdit={handleEditOrder}
                                   onDelete={handleDeleteOrder}
                                   nfeInfo={notasFiscais[order.id]}
+                                  onOpenNfeModal={(o) => setNfeOrder(o)}
                                 />
                               </div>
                             )}
@@ -922,6 +943,19 @@ const handleDragEnd = (result: DropResult) => {
       )}
 
       
+    
+      <AnimatePresence>
+        {nfeOrder && (
+          <NfeModal
+            order={nfeOrder}
+            nfeInfo={notasFiscais[nfeOrder.id]}
+            onClose={() => setNfeOrder(null)}
+            onConfirmEmit={handleConfirmEmitNfe}
+            onReemit={handleConfirmEmitNfe}
+          />
+        )}
+      </AnimatePresence>
+
     </DashboardLayout>
   );
 };

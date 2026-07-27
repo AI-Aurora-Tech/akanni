@@ -13,10 +13,11 @@ interface KanbanCardProps {
   onIssueNfe: (order: Order) => void;
   onEdit: (order: Order) => void;
   onDelete: (orderId: string) => void;
+  onOpenNfeModal?: (order: any) => void;
   nfeInfo?: any;
 }
 
-export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, onIssueNfe, onEdit, onDelete, nfeInfo }) => {
+export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, onIssueNfe, onEdit, onDelete, nfeInfo, onOpenNfeModal }) => {
   const { profile } = useAuth();
   const canManageOrders = profile?.role === 'super_admin' || 
                           profile?.role === 'admin_geral' || 
@@ -186,45 +187,27 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
 
             
             {nfeInfo ? (
-              <div className="flex space-x-1 items-center">
+              <div className="flex space-x-1 items-center" onClick={(e) => { e.stopPropagation(); if (onOpenNfeModal) onOpenNfeModal(order); }}>
                 {nfeInfo.status === 'processando' && (
-                  <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter">NF-e Proc...</span>
+                  <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter cursor-pointer hover:bg-yellow-200">NF-e Proc...</span>
                 )}
                 {nfeInfo.status === 'autorizada' && (
-                  <div className="flex space-x-1">
-                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter">NF-e Autorizada</span>
-                    {nfeInfo.url_danfe && (
-                      <a href={nfeInfo.url_danfe} target="_blank" rel="noreferrer" className="bg-zinc-100 text-zinc-600 px-2 py-1 rounded-lg text-[10px] hover:bg-zinc-200 uppercase font-bold">DANFE</a>
-                    )}
-                    {nfeInfo.url_xml && (
-                      <a href={nfeInfo.url_xml} target="_blank" rel="noreferrer" className="bg-zinc-100 text-zinc-600 px-2 py-1 rounded-lg text-[10px] hover:bg-zinc-200 uppercase font-bold">XML</a>
-                    )}
+                  <div className="flex space-x-1 cursor-pointer">
+                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-green-200">NF-e Autorizada</span>
                   </div>
                 )}
                 {nfeInfo.status === 'erro' && (
-                  <div className="flex space-x-1">
-                    <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter" title={nfeInfo.mensagem_erro || 'Erro'}>NF-e ERRO</span>
-                    <button onClick={() => {
-                        fetch('/api/nfe/emit', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ orderId: order.id })
-                        }).then(() => alert('Reenviado para emissão. Atualize em alguns instantes.'));
-                    }} className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-blue-700 transition-colors shadow-sm">
-                      Reemitir
-                    </button>
+                  <div className="flex space-x-1 cursor-pointer">
+                    <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-red-200" title={nfeInfo.mensagem_erro || 'Erro'}>NF-e ERRO</span>
                   </div>
                 )}
               </div>
             ) : (
               isNfeRequired && !order.nfeIssued && (
                 <button
-                  onClick={() => {
-                     fetch('/api/nfe/emit', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ orderId: order.id })
-                        }).then(() => alert('Enviado para emissão. Atualize em alguns instantes.'));
+                  onClick={(e) => {
+                     e.stopPropagation();
+                     if (onOpenNfeModal) onOpenNfeModal(order);
                   }}
                   className="bg-blue-600 text-white text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-blue-700 transition-colors shadow-sm"
                 >
