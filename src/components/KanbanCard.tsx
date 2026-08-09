@@ -186,14 +186,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
             </button>
 
             
-            {nfeInfo ? (
+            {nfeInfo && nfeInfo.status !== 'cancelado' ? (
               <div className="flex space-x-1 items-center" onClick={(e) => { e.stopPropagation(); if (onOpenNfeModal) onOpenNfeModal(order); }}>
                 {nfeInfo.status === 'processando' && (
                   <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter cursor-pointer hover:bg-yellow-200">NF-e Proc...</span>
                 )}
                 {nfeInfo.status === 'autorizada' && (
                   <div className="flex space-x-1 cursor-pointer">
-                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-green-200">NF-e Autorizada</span>
+                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-green-200">✓ Nota Emitida</span>
                   </div>
                 )}
                 {nfeInfo.status === 'erro' && (

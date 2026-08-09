@@ -72,7 +72,8 @@ const OrderBoard = () => {
           items: Array.isArray(o.items) ? o.items.map((i: any) => ({
             ...i,
             quantity: Number(i.quantity) || 0,
-            totalFabricEstimate: Number(i.totalFabricEstimate) || 0
+            totalFabricEstimate: Number(i.totalFabricEstimate) || 0,
+            unitPrice: i.unitPrice != null ? Number(i.unitPrice) : undefined
           })) : [],
           deliveryDate: o.delivery_date || new Date().toISOString(),
           designImages: Array.isArray(o.design_images) ? o.design_images : [],
@@ -188,7 +189,7 @@ const OrderBoard = () => {
     const initData = async () => {
       setLoading(true);
       try {
-        await Promise.all([fetchOrders(), fetchStock(), fetchTemplates(), fetchClients()]);
+        await Promise.all([fetchOrders(), fetchStock(), fetchTemplates(), fetchClients(), fetchNotasFiscais()]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -198,15 +199,20 @@ const OrderBoard = () => {
     const ordersChannel = supabase.channel('orders-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
       .subscribe();
-    
+
     const clientsChannel = supabase.channel('clients-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, fetchClients)
       .subscribe();
-    
+
+    const nfeChannel = supabase.channel('nfe-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notas_fiscais' }, fetchNotasFiscais)
+      .subscribe();
+
     return () => {
       mounted = false;
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(clientsChannel);
+      supabase.removeChannel(nfeChannel);
     };
   }, [user]);
 
@@ -427,14 +433,9 @@ const OrderBoard = () => {
       if (error) throw error;
       fetchOrders();
 
-      // Automático: emitir NF-e se mudar para 'delivered'
-      if (newStatus === 'delivered' && !notasFiscais[orderId]) {
-        fetch('/api/nfe/emit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId })
-        }).then(() => fetchNotasFiscais()).catch(console.error);
-      }
+      // A emissão de NF-e NUNCA é automática: é sempre feita manualmente pelo
+      // usuário através do fluxo de conferência (evita emitir notas incorretas,
+      // ainda mais em ambiente de homologação/teste).
 
     } catch (err: any) {
       console.error("Error changing status:", err);
@@ -550,18 +551,43 @@ const handleDragEnd = (result: DropResult) => {
   };
 
   
-  const handleConfirmEmitNfe = async (orderId: string) => {
+  const handleConfirmEmitNfe = async (orderId: string, itemPrices?: number[]) => {
+    let data: any = {};
     try {
       const response = await fetch('/api/nfe/emit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId })
+        body: JSON.stringify({ orderId, itemPrices })
       });
+      const contentType = response.headers.get('content-type') || '';
+      data = contentType.includes('application/json') ? await response.json() : { error: await response.text() };
+
       if (!response.ok) {
-        throw new Error('Falha ao solicitar emissão. Tente novamente.');
+        throw new Error(data.mensagem || data.error || 'Falha ao emitir a nota fiscal.');
       }
-      alert('Emissão solicitada com sucesso! Acompanhe o status.');
-      fetchNotasFiscais();
+    } catch (err: any) {
+      // Sincroniza o estado local antes de propagar o erro (ex.: nota marcada como 'erro').
+      await Promise.all([fetchNotasFiscais(), fetchOrders()]);
+      throw err;
+    }
+    await Promise.all([fetchNotasFiscais(), fetchOrders()]);
+    return data;
+  };
+
+  const handleCancelNfe = async (orderId: string, justificativa?: string) => {
+    try {
+      const response = await fetch('/api/nfe/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, justificativa })
+      });
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await response.json() : { error: await response.text() };
+      if (!response.ok) {
+        throw new Error(data.mensagem || data.error || 'Falha ao cancelar a nota fiscal.');
+      }
+      await Promise.all([fetchNotasFiscais(), fetchOrders()]);
+      return data;
     } catch (err: any) {
       throw err;
     }
@@ -928,16 +954,18 @@ const handleDragEnd = (result: DropResult) => {
 
       {/* Forms & Popups */}
       {isOrderFormOpen && (
-        <OrderForm 
+        <OrderForm
           templates={templates}
           stock={stock}
           clients={clients}
           initialData={editingOrder}
+          nfeInfo={editingOrder ? notasFiscais[editingOrder.id] : undefined}
+          onCancelNfe={handleCancelNfe}
           onClose={() => {
             setIsOrderFormOpen(false);
             setEditingOrder(null);
-          }} 
-          onSubmit={handleCreateOrder} 
+          }}
+          onSubmit={handleCreateOrder}
           onDeleteOrder={handleDeleteOrder}
         />
       )}
@@ -951,7 +979,7 @@ const handleDragEnd = (result: DropResult) => {
             nfeInfo={notasFiscais[nfeOrder.id]}
             onClose={() => setNfeOrder(null)}
             onConfirmEmit={handleConfirmEmitNfe}
-            onReemit={handleConfirmEmitNfe}
+            onCancelNfe={handleCancelNfe}
           />
         )}
       </AnimatePresence>

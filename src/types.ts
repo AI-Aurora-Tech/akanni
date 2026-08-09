@@ -29,6 +29,7 @@ export interface OrderItem {
   color?: string;
   collarTemplateId?: string;
   buttonTemplateId?: string;
+  unitPrice?: number; // Preço unitário de venda (usado para valor da NF-e)
 }
 
 export interface Order {

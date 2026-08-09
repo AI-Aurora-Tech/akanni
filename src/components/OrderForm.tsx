@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Save, Plus, Package, Calculator, Trash2, ShoppingBasket, AlertCircle, Search, UserPlus } from 'lucide-react';
+import { X, Save, Plus, Package, Calculator, Trash2, ShoppingBasket, AlertCircle, Search, UserPlus, Ban, RefreshCw, FileText } from 'lucide-react';
 import { Order, OrderStatus, FabricTemplate, OrderItem, StockItem, Client } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
@@ -12,9 +12,13 @@ interface OrderFormProps {
   onSubmit: (order: Partial<Order>) => void;
   initialData?: Order | null;
   onDeleteOrder?: (id: string) => void;
+  nfeInfo?: any;
+  onCancelNfe?: (orderId: string, justificativa: string) => Promise<any>;
 }
 
-export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients, onClose, onSubmit, initialData, onDeleteOrder }) => {
+const DEFAULT_UNIT_PRICE = 85;
+
+export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients, onClose, onSubmit, initialData, onDeleteOrder, nfeInfo, onCancelNfe }) => {
   // Extract unique fabric types and colors from stock
   const fabrics = useMemo(() => {
     const list = stock.filter(s => ['fabric', 'tecido', 'tecidos'].includes((s.type || '').trim().toLowerCase()));
@@ -27,6 +31,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
 
   const [clientMode, setClientMode] = useState<'select' | 'new'>(initialData ? 'select' : 'select');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  // Cancelamento de NF-e
+  const hasAuthorizedNfe = !!initialData && nfeInfo?.status === 'autorizada';
+  const [showNfeCancel, setShowNfeCancel] = useState(false);
+  const [nfeJustificativa, setNfeJustificativa] = useState('Cancelamento solicitado pelo emitente - dados incorretos no pedido.');
+  const [nfeCancelLoading, setNfeCancelLoading] = useState(false);
+  const [nfeCancelError, setNfeCancelError] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [clientSearch, setClientSearch] = useState('');
   
@@ -88,7 +99,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
       fabricType: fabrics[0]?.name || '',
       fabricColor: fabrics[0]?.colors[0] || '',
       fabricUsagePerUnit: defaultCamisa?.fabricConsumption || 1.2,
-      totalFabricEstimate: parseFloat((10 * (defaultCamisa?.fabricConsumption || 1.2)).toFixed(1))
+      totalFabricEstimate: parseFloat((10 * (defaultCamisa?.fabricConsumption || 1.2)).toFixed(1)),
+      unitPrice: DEFAULT_UNIT_PRICE
     }];
   });
 
@@ -105,8 +117,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
       fabricType: fabrics[0]?.name || '',
       fabricColor: fabrics[0]?.colors[0] || '',
       fabricUsagePerUnit: defaultCamisa?.fabricConsumption || 1.2,
-      totalFabricEstimate: parseFloat((10 * (defaultCamisa?.fabricConsumption || 1.2)).toFixed(1))
+      totalFabricEstimate: parseFloat((10 * (defaultCamisa?.fabricConsumption || 1.2)).toFixed(1)),
+      unitPrice: DEFAULT_UNIT_PRICE
     }]);
+  };
+
+  const calculateGrandTotalValue = () => {
+    return items.reduce((acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
   };
 
   const removeItem = (idx: number) => {
@@ -175,6 +192,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
     const finalItems = items.map(item => ({
       ...item,
       quantity: Number.isNaN(item.quantity) ? 0 : item.quantity,
+      unitPrice: item.unitPrice != null && !Number.isNaN(item.unitPrice) ? Number(item.unitPrice) : DEFAULT_UNIT_PRICE,
     })) as OrderItem[];
 
     if (finalItems.some(i => i.quantity <= 0)) {
@@ -548,6 +566,26 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                               onChange={e => updateItem(idx, 'color', e.target.value)}
                             />
                           </div>
+
+                          <div className="md:col-span-2">
+                            <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1 ml-1">Preço Unitário (R$) — usado na Nota Fiscal</label>
+                            <div className="flex items-center gap-3">
+                              <div className="relative flex-1 max-w-[180px]">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm font-semibold">R$</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-zinc-900 transition-all h-12"
+                                  value={item.unitPrice ?? ''}
+                                  onChange={e => updateItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                />
+                              </div>
+                              <div className="text-xs text-zinc-500">
+                                Subtotal: <span className="font-bold font-mono text-zinc-900">R$ {((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         {/* Calculations per Item */}
@@ -594,9 +632,24 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                 <p className="text-[9px] font-bold uppercase opacity-60 tracking-wider">Golas Totais</p>
                 <p className="text-base font-black font-mono">{calculateGrandTotalCollars()} un</p>
               </div>
+              <div className="h-8 w-px bg-white/15 hidden sm:block"></div>
+              <div>
+                <p className="text-[9px] font-bold uppercase opacity-60 tracking-wider">Valor Total</p>
+                <p className="text-base font-black font-mono text-emerald-400">R$ {calculateGrandTotalValue().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              {hasAuthorizedNfe && onCancelNfe && (
+                <button
+                  type="button"
+                  onClick={() => setShowNfeCancel(true)}
+                  className="px-6 py-4 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 hover:border-amber-300 border border-amber-200/70 rounded-2xl font-black text-sm flex items-center justify-center transition-all shadow-md active:scale-95"
+                >
+                  <Ban size={18} className="mr-2 stroke-[2.5]" />
+                  Cancelar Nota Fiscal
+                </button>
+              )}
               {initialData && onDeleteOrder && (
                 <button
                   type="button"
@@ -660,6 +713,75 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                   className="flex-1 px-5 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-red-200"
                 >
                   Sim, Cancelar e Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Pop-up de Cancelamento de Nota Fiscal */}
+      <AnimatePresence>
+        {showNfeCancel && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] p-6 md:p-8 max-w-md w-full shadow-2xl border border-amber-100 flex flex-col text-center relative"
+            >
+              <div className="p-4 bg-amber-50 text-amber-600 rounded-full mb-4 mx-auto">
+                <FileText size={36} className="stroke-[2.5]" />
+              </div>
+              <h3 className="text-xl font-bold text-zinc-900 mb-2">Cancelar Nota Fiscal?</h3>
+              <p className="text-sm text-zinc-500 mb-4 leading-relaxed">
+                A NF-e {nfeInfo?.numero ? <>nº <strong>{nfeInfo.numero}</strong></> : 'autorizada'} deste pedido será cancelada na Sefaz.
+                Depois disso o pedido volta a permitir uma nova emissão.
+              </p>
+              <div className="text-left mb-4">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-1 ml-1">Justificativa (mín. 15 caracteres)</label>
+                <textarea
+                  rows={3}
+                  value={nfeJustificativa}
+                  onChange={e => setNfeJustificativa(e.target.value)}
+                  className="w-full px-4 py-3 border border-zinc-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                />
+                {nfeCancelError && <p className="text-xs text-red-600 font-medium mt-2">{nfeCancelError}</p>}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full">
+                <button
+                  type="button"
+                  disabled={nfeCancelLoading}
+                  onClick={() => { setShowNfeCancel(false); setNfeCancelError(''); }}
+                  className="flex-1 px-5 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  disabled={nfeCancelLoading}
+                  onClick={async () => {
+                    if (nfeJustificativa.trim().length < 15) {
+                      setNfeCancelError('A justificativa deve ter ao menos 15 caracteres (exigência da Sefaz).');
+                      return;
+                    }
+                    if (!initialData?.id || !onCancelNfe) return;
+                    setNfeCancelLoading(true);
+                    setNfeCancelError('');
+                    try {
+                      await onCancelNfe(initialData.id, nfeJustificativa.trim());
+                      setShowNfeCancel(false);
+                      onClose();
+                    } catch (err: any) {
+                      setNfeCancelError(err?.message || 'Erro ao cancelar a nota fiscal.');
+                    } finally {
+                      setNfeCancelLoading(false);
+                    }
+                  }}
+                  className="flex-1 px-5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-amber-200 flex items-center justify-center disabled:opacity-60"
+                >
+                  {nfeCancelLoading ? <RefreshCw size={16} className="animate-spin mr-2" /> : <Ban size={16} className="mr-2" />}
+                  Confirmar Cancelamento
                 </button>
               </div>
             </motion.div>
