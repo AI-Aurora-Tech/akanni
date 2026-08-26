@@ -12,16 +12,12 @@ interface NfeModalProps {
   onClose: () => void;
   onConfirmEmit: (orderId: string, itemPrices: number[]) => Promise<any>;
   onCancelNfe?: (orderId: string, justificativa: string) => Promise<any>;
+  onCheckStatus?: (ref: string) => Promise<any>;
 }
 
-// Dados do emitente exibidos na prévia (espelham a configuração do servidor).
-const EMITTER = {
-  nome: 'Akanni Confecções (FBF Confecção LTDA)',
-  cnpj: '60.920.351/0001-42',
-  endereco: 'R. Dr. Gabriel Costa, 14 - Vila Nova das Belezas, São Paulo/SP',
-};
-
 const DEFAULT_UNIT_PRICE = 85;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const brl = (v: number) =>
   `R$ ${(Number.isFinite(v) ? v : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -29,7 +25,7 @@ const brl = (v: number) =>
 type WizardStep = 'conference' | 'nfe';
 type Result = { status: 'autorizada' | 'processando' | 'erro'; mensagem?: string } | null;
 
-export const NfeModal: React.FC<NfeModalProps> = ({ order, nfeInfo, onClose, onConfirmEmit, onCancelNfe }) => {
+export const NfeModal: React.FC<NfeModalProps> = ({ order, nfeInfo, onClose, onConfirmEmit, onCancelNfe, onCheckStatus }) => {
   // Modo wizard quando não há nota, ou quando o usuário optar por refazer a emissão.
   const [forceWizard, setForceWizard] = useState(false);
   const [step, setStep] = useState<WizardStep>('conference');
@@ -74,11 +70,21 @@ export const NfeModal: React.FC<NfeModalProps> = ({ order, nfeInfo, onClose, onC
       const status = data?.status;
       if (status === 'autorizada') {
         setResult({ status: 'autorizada' });
-      } else if (status === 'processando') {
-        setResult({ status: 'processando' });
+      } else if (status === 'erro') {
+        setResult({ status: 'erro', mensagem: data?.mensagem || 'Erro ao emitir a nota fiscal.' });
       } else {
-        // Sem status explícito, tratamos como processando (segurança).
+        // 'processando': mostra o spinner e consulta o status periodicamente.
         setResult({ status: 'processando' });
+        if (data?.ref && onCheckStatus) {
+          for (let i = 0; i < 12; i++) {
+            await sleep(2500);
+            try {
+              const s = await onCheckStatus(data.ref);
+              if (s?.status === 'autorizada') { setResult({ status: 'autorizada' }); break; }
+              if (s?.status === 'erro') { setResult({ status: 'erro', mensagem: s?.mensagem || 'Erro na autorização da nota fiscal.' }); break; }
+            } catch { /* continua tentando */ }
+          }
+        }
       }
     } catch (err: any) {
       setResult({ status: 'erro', mensagem: err?.message || 'Erro ao emitir a nota fiscal.' });
@@ -248,9 +254,8 @@ export const NfeModal: React.FC<NfeModalProps> = ({ order, nfeInfo, onClose, onC
 
                   <div className="p-4 border-b border-zinc-100">
                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2 flex items-center gap-2"><Building2 size={13} /> Emitente</h4>
-                    <p className="font-semibold text-zinc-800">{EMITTER.nome}</p>
-                    <p className="text-zinc-500 text-xs">CNPJ: {EMITTER.cnpj}</p>
-                    <p className="text-zinc-500 text-xs">{EMITTER.endereco}</p>
+                    <p className="font-semibold text-zinc-800">Akanni Confecções</p>
+                    <p className="text-zinc-500 text-xs">Emitente vinculado à sua conta FocusNFe (empresa do token).</p>
                   </div>
 
                   <div className="p-4 border-b border-zinc-100">

@@ -574,6 +574,19 @@ const handleDragEnd = (result: DropResult) => {
     return data;
   };
 
+  const handleCheckNfeStatus = async (ref: string) => {
+    try {
+      const response = await fetch(`/api/nfe/status/${ref}`);
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await response.json() : {};
+      await Promise.all([fetchNotasFiscais(), fetchOrders()]);
+      return data;
+    } catch (err) {
+      console.error('Erro ao consultar status da NF-e:', err);
+      return { status: 'processando' };
+    }
+  };
+
   const handleCancelNfe = async (orderId: string, justificativa?: string) => {
     try {
       const response = await fetch('/api/nfe/cancel', {
@@ -980,6 +993,7 @@ const handleDragEnd = (result: DropResult) => {
             onClose={() => setNfeOrder(null)}
             onConfirmEmit={handleConfirmEmitNfe}
             onCancelNfe={handleCancelNfe}
+            onCheckStatus={handleCheckNfeStatus}
           />
         )}
       </AnimatePresence>
