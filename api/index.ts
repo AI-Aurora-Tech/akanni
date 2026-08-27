@@ -237,11 +237,14 @@ export function createApiApp() {
           unidade_tributavel: "UN",
           quantidade_tributavel: qty,
           valor_unitario_tributavel: unitPrice.toFixed(2),
-          // Nomes corretos esperados pelo FocusNFe (antes: origem_mercadoria/csosn,
-          // que eram ignorados -> a origem ia vazia e a Sefaz rejeitava).
-          // Empresa é Simples Nacional -> usa CSOSN (não CST).
-          icms_origem: "0", // 0 = Nacional
-          icms_csosn: "400" // 400 = Não tributada pelo Simples Nacional
+          // ICMS do item. Empresa é Simples Nacional (usa CSOSN "400").
+          // O FocusNFe gera o grupo <imposto>/<ICMS> a partir de
+          // icms_situacao_tributaria (que aqui carrega o CSOSN); sem ele, o
+          // grupo <imposto> não é gerado e a Sefaz recusa por XML inválido.
+          // icms_origem preenche a origem da mercadoria (0 = Nacional).
+          icms_origem: "0",
+          icms_situacao_tributaria: "400",
+          icms_csosn: "400"
         };
       });
 
