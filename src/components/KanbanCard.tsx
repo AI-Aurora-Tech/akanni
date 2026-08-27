@@ -41,6 +41,18 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
 
   const isNfeRequired = order.status === 'finishing' || order.status === 'delivered';
 
+  // Tag de status da NF-e exibida na parte de baixo do card.
+  const nfeStatus = nfeInfo?.status;
+  const nfeTag = (() => {
+    if (nfeStatus === 'autorizada') return { label: 'Nota emitida', cls: 'bg-green-100 text-green-700', dot: 'bg-green-500' };
+    if (nfeStatus === 'processando') return { label: 'Emitindo NF-e...', cls: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' };
+    if (nfeStatus === 'erro') return { label: 'Falha na emissão', cls: 'bg-red-100 text-red-700', dot: 'bg-red-500' };
+    if (nfeStatus === 'cancelado') return { label: 'Nota cancelada', cls: 'bg-zinc-200 text-zinc-600', dot: 'bg-zinc-400' };
+    if (isNfeRequired && !order.nfeIssued) return { label: 'Pendente emissão', cls: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
+    return null;
+  })();
+  const canEmit = isNfeRequired && !order.nfeIssued && (!nfeInfo || nfeStatus === 'cancelado');
+
   const delayInStatus = useMemo(() => {
     if (order.status === 'delivered') return 0;
     const startedAt = order.statusStartedAt ? new Date(order.statusStartedAt) : new Date(order.createdAt);
@@ -162,48 +174,45 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t border-zinc-50 mt-auto">
-          <div className="flex space-x-1">
-            {order.photos.length > 0 && (
-              <div className="p-1 bg-zinc-50 rounded text-zinc-400 group-hover:text-blue-500 transition-colors">
-                <ImageIcon size={14} />
-              </div>
-            )}
-            {order.notes && (
-              <div className="p-1 bg-zinc-50 rounded text-zinc-400 group-hover:text-zinc-900 transition-colors">
-                <FileText size={14} />
-              </div>
-            )}
-          </div>
+        <div className="pt-3 border-t border-zinc-50 mt-auto space-y-2.5">
+          {/* Tag de status da NF-e */}
+          {nfeTag && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <span
+                onClick={() => { if (nfeInfo && onOpenNfeModal) onOpenNfeModal(order); }}
+                title={nfeStatus === 'erro' ? (nfeInfo?.mensagem_erro || 'Erro na emissão') : undefined}
+                className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tighter px-2.5 py-1 rounded-lg ${nfeTag.cls} ${nfeInfo ? 'cursor-pointer hover:opacity-80' : ''}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${nfeTag.dot}`} />
+                {nfeTag.label}
+              </span>
+            </div>
+          )}
 
-          <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={handleWhatsAppStatus}
-              className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
-              title="Enviar Status via WhatsApp"
-            >
-              <MessageCircle size={14} />
-            </button>
+          <div className="flex items-center justify-between">
+            <div className="flex space-x-1">
+              {order.photos.length > 0 && (
+                <div className="p-1 bg-zinc-50 rounded text-zinc-400 group-hover:text-blue-500 transition-colors">
+                  <ImageIcon size={14} />
+                </div>
+              )}
+              {order.notes && (
+                <div className="p-1 bg-zinc-50 rounded text-zinc-400 group-hover:text-zinc-900 transition-colors">
+                  <FileText size={14} />
+                </div>
+              )}
+            </div>
 
-            
-            {nfeInfo && nfeInfo.status !== 'cancelado' ? (
-              <div className="flex space-x-1 items-center" onClick={(e) => { e.stopPropagation(); if (onOpenNfeModal) onOpenNfeModal(order); }}>
-                {nfeInfo.status === 'processando' && (
-                  <span className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter cursor-pointer hover:bg-yellow-200">NF-e Proc...</span>
-                )}
-                {nfeInfo.status === 'autorizada' && (
-                  <div className="flex space-x-1 cursor-pointer">
-                    <span className="bg-green-100 text-green-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-green-200">✓ Nota Emitida</span>
-                  </div>
-                )}
-                {nfeInfo.status === 'erro' && (
-                  <div className="flex space-x-1 cursor-pointer">
-                    <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-tighter hover:bg-red-200" title={nfeInfo.mensagem_erro || 'Erro'}>NF-e ERRO</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              isNfeRequired && !order.nfeIssued && (
+            <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={handleWhatsAppStatus}
+                className="p-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+                title="Enviar Status via WhatsApp"
+              >
+                <MessageCircle size={14} />
+              </button>
+
+              {canEmit && (
                 <button
                   onClick={(e) => {
                      e.stopPropagation();
@@ -213,28 +222,27 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
                 >
                   Emitir NF-e
                 </button>
-              )
-            )}
-
-
-            <div className="flex space-x-0.5">
-              {currentIndex > 0 && (
-                <button
-                  onClick={() => onStatusChange(order.id, statuses[currentIndex - 1])}
-                  className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 transition-colors"
-                >
-                  <ArrowLeft size={14} />
-                </button>
               )}
-              
-              {currentIndex < statuses.length - 1 && (
-                <button
-                  onClick={() => onStatusChange(order.id, statuses[currentIndex + 1])}
-                  className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 transition-colors"
-                >
-                  <ArrowRight size={14} />
-                </button>
-              )}
+
+              <div className="flex space-x-0.5">
+                {currentIndex > 0 && (
+                  <button
+                    onClick={() => onStatusChange(order.id, statuses[currentIndex - 1])}
+                    className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 transition-colors"
+                  >
+                    <ArrowLeft size={14} />
+                  </button>
+                )}
+
+                {currentIndex < statuses.length - 1 && (
+                  <button
+                    onClick={() => onStatusChange(order.id, statuses[currentIndex + 1])}
+                    className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 transition-colors"
+                  >
+                    <ArrowRight size={14} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

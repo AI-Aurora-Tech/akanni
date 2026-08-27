@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, Box, Users, Settings, LogOut, Menu, X, Bell } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Box, Users, Settings, LogOut, Menu, X, Bell, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -167,6 +167,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
     { id: 'dashboard', label: 'Painel Geral', icon: <LayoutDashboard size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral'] },
     { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
     { id: 'clients', label: 'Clientes', icon: <Users size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
+    { id: 'nfe', label: 'Notas Fiscais', icon: <FileText size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral'] },
     { id: 'templates', label: 'Modelos de Gasto', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
     { id: 'inventory', label: 'Estoque de Tecidos', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
     { id: 'users', label: 'Usuários', icon: <Users size={20} />, roles: ['super_admin'] },

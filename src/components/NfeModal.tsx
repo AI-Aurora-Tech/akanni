@@ -51,7 +51,8 @@ export const NfeModal: React.FC<NfeModalProps> = ({ order, nfeInfo, onClose, onC
 
   if (!order) return null;
 
-  const showWizard = forceWizard || !nfeInfo;
+  // Nota cancelada abre direto o fluxo de (re)emissão.
+  const showWizard = forceWizard || !nfeInfo || nfeInfo.status === 'cancelado';
 
   const updatePrice = (idx: number, value: number) => {
     setPrices((prev) => prev.map((p, i) => (i === idx ? value : p)));

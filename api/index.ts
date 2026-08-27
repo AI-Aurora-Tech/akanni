@@ -377,7 +377,14 @@ export function createApiApp() {
         return res.status(422).json({ mensagem });
       }
 
-      await getSupabase().from('notas_fiscais').delete().eq('id', nfe.id);
+      // Mantém o registro como 'cancelado' (histórico + tag no card / tela de NFs).
+      // A reemissão remove esta nota (ver bloco de idempotência do /emit) e cria
+      // uma nova com nova referência.
+      await getSupabase().from('notas_fiscais').update({
+        status: 'cancelado',
+        mensagem_erro: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', nfe.id);
       await getSupabase().from('orders').update({ nfe_issued: false }).eq('id', orderId);
       return res.status(200).json({ status: 'cancelado', mensagem: "Nota fiscal cancelada com sucesso." });
     } catch (error: any) {
