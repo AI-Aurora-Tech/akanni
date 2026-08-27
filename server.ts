@@ -1,7 +1,7 @@
 import path from "path";
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { createApiApp, runPollingOnce } from "./apiApp";
+import { createApiApp, runPollingOnce } from "./api/index";
 
 // Servidor standalone (desenvolvimento local e hosts Node como Render/Railway).
 // Na Vercel a API roda como função serverless em api/index.ts (ver vercel.json).
