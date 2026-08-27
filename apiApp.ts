@@ -7,7 +7,20 @@ dotenv.config();
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+
+// Inicialização PREGUIÇOSA do Supabase: criar o cliente no topo do módulo com
+// URL/KEY vazios lança erro e derruba a função serverless inteira
+// (FUNCTION_INVOCATION_FAILED) antes de qualquer rota rodar. Fazendo lazy, um
+// erro de configuração vira uma resposta JSON legível em vez de um crash.
+let _supabase: any = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error("Supabase não configurado no servidor. Defina VITE_SUPABASE_URL (ou SUPABASE_URL) e SUPABASE_SERVICE_ROLE_KEY (ou VITE_SUPABASE_ANON_KEY) nas variáveis de ambiente da Vercel.");
+  }
+  _supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  return _supabase;
+}
 
 const FOCUS_TOKEN = process.env.FOCUS_NFE_TOKEN?.trim();
 const FOCUS_ENV = (process.env.FOCUS_NFE_ENVIRONMENT || 'sandbox').trim();
@@ -80,10 +93,10 @@ const aplicarRetornoNfe = async (ref: string, pedidoId: string | null, p: any) =
       || "Erro na autorização junto à Sefaz.";
   }
 
-  await supabase.from('notas_fiscais').update(updateData).eq('ref', ref);
+  await getSupabase().from('notas_fiscais').update(updateData).eq('ref', ref);
 
   if (pedidoId) {
-    await supabase.from('orders').update({ nfe_issued: status === 'autorizado' }).eq('id', pedidoId);
+    await getSupabase().from('orders').update({ nfe_issued: status === 'autorizado' }).eq('id', pedidoId);
   }
   return { internalStatus, updateData };
 };
@@ -106,7 +119,7 @@ export async function runPollingOnce() {
   try {
     if (!FOCUS_TOKEN) return;
     const twoMinutesAgo = new Date(Date.now() - 2 * 60000).toISOString();
-    const { data: presas } = await supabase
+    const { data: presas } = await getSupabase()
       .from('notas_fiscais')
       .select('*')
       .eq('status', 'processando')
@@ -142,6 +155,19 @@ export function createApiApp() {
     console.log("[FocusNFe] HOMOLOGAÇÃO: notas de teste NÃO têm validade fiscal.");
   }
 
+  // Diagnóstico: mostra quais variáveis de ambiente a função enxerga em runtime
+  // (sem expor valores). Útil para depurar deploy na Vercel.
+  app.get("/api/nfe/health", (_req, res) => {
+    res.json({
+      ok: true,
+      ambiente: FOCUS_ENV,
+      focus_token_configurado: !!FOCUS_TOKEN,
+      supabase_url_configurada: !!SUPABASE_URL,
+      supabase_key_configurada: !!SUPABASE_KEY,
+      emitente_via_env: Object.keys(EMITENTE).length > 0,
+    });
+  });
+
   // Emissão de NF-e (Produto)
   app.post("/api/nfe/emit", async (req, res) => {
     try {
@@ -152,16 +178,16 @@ export function createApiApp() {
       const { orderId, itemPrices } = req.body;
       if (!orderId) return res.status(400).json({ status: 'erro', mensagem: "ID do pedido obrigatório." });
 
-      const { data: order, error: orderErr } = await supabase.from('orders').select('*').eq('id', orderId).single();
+      const { data: order, error: orderErr } = await getSupabase().from('orders').select('*').eq('id', orderId).single();
       if (orderErr || !order) return res.status(404).json({ status: 'erro', mensagem: "Pedido não encontrado." });
 
       // Idempotência: bloqueia se já existe nota viva (processando/autorizada).
-      const { data: existingNfe } = await supabase.from('notas_fiscais').select('*').eq('pedido_id', orderId).maybeSingle();
+      const { data: existingNfe } = await getSupabase().from('notas_fiscais').select('*').eq('pedido_id', orderId).maybeSingle();
       if (existingNfe && (existingNfe.status === 'processando' || existingNfe.status === 'autorizada')) {
         return res.status(409).json({ status: existingNfe.status, mensagem: "Já existe uma nota fiscal ativa ou em processamento para este pedido.", nfe: existingNfe });
       }
       if (existingNfe) {
-        await supabase.from('notas_fiscais').delete().eq('id', existingNfe.id);
+        await getSupabase().from('notas_fiscais').delete().eq('id', existingNfe.id);
       }
 
       const ufDestino = (order.customer_address?.match(/([A-Z]{2})(?:\s*-\s*CEP.*)?$/)?.[1] || UF_EMITENTE).toUpperCase();
@@ -255,7 +281,7 @@ export function createApiApp() {
       const shortId = orderId.replace(/-/g, "").substring(0, 12).toUpperCase();
       const ref = `PED${shortId}${Date.now().toString(36).toUpperCase()}`;
 
-      await supabase.from('notas_fiscais').insert({
+      await getSupabase().from('notas_fiscais').insert({
         pedido_id: orderId,
         ref: ref,
         status: 'processando',
@@ -272,7 +298,7 @@ export function createApiApp() {
         const { mensagem, status, erros } = extrairMensagemFocus(focusError);
         console.error(`[FocusNFe] Erro na emissão (HTTP ${status}):`, JSON.stringify(focusError.response?.data || mensagem, null, 2));
 
-        await supabase.from('notas_fiscais').update({ status: 'erro', mensagem_erro: mensagem, updated_at: new Date().toISOString() }).eq('ref', ref);
+        await getSupabase().from('notas_fiscais').update({ status: 'erro', mensagem_erro: mensagem, updated_at: new Date().toISOString() }).eq('ref', ref);
         return res.status(422).json({ status: 'erro', mensagem, erros, ref });
       }
 
@@ -295,7 +321,7 @@ export function createApiApp() {
       }
 
       if (finalStatus === 'autorizada') {
-        const { data: nf } = await supabase.from('notas_fiscais').select('*').eq('ref', ref).single();
+        const { data: nf } = await getSupabase().from('notas_fiscais').select('*').eq('ref', ref).single();
         return res.status(200).json({ status: 'autorizada', ref, nfe: nf });
       }
       if (finalStatus === 'erro') {
@@ -305,7 +331,7 @@ export function createApiApp() {
 
     } catch (error: any) {
       console.error("[FocusNFe] Erro interno na emissão:", error);
-      res.status(500).json({ status: 'erro', mensagem: "Erro interno do servidor ao emitir a nota fiscal." });
+      res.status(500).json({ status: 'erro', mensagem: error?.message || "Erro interno do servidor ao emitir a nota fiscal." });
     }
   });
 
@@ -317,7 +343,7 @@ export function createApiApp() {
       const { orderId, justificativa } = req.body;
       if (!orderId) return res.status(400).json({ mensagem: "ID do pedido obrigatório." });
 
-      const { data: nfe } = await supabase.from('notas_fiscais').select('*').eq('pedido_id', orderId).maybeSingle();
+      const { data: nfe } = await getSupabase().from('notas_fiscais').select('*').eq('pedido_id', orderId).maybeSingle();
       if (!nfe) return res.status(404).json({ mensagem: "Nenhuma nota fiscal encontrada para este pedido." });
       if (nfe.status !== 'autorizada') {
         return res.status(400).json({ mensagem: "Só é possível cancelar notas fiscais autorizadas." });
@@ -335,12 +361,12 @@ export function createApiApp() {
         return res.status(422).json({ mensagem });
       }
 
-      await supabase.from('notas_fiscais').delete().eq('id', nfe.id);
-      await supabase.from('orders').update({ nfe_issued: false }).eq('id', orderId);
+      await getSupabase().from('notas_fiscais').delete().eq('id', nfe.id);
+      await getSupabase().from('orders').update({ nfe_issued: false }).eq('id', orderId);
       return res.status(200).json({ status: 'cancelado', mensagem: "Nota fiscal cancelada com sucesso." });
     } catch (error: any) {
       console.error("[FocusNFe] Erro interno no cancelamento:", error);
-      res.status(500).json({ mensagem: "Erro interno do servidor ao cancelar a nota fiscal." });
+      res.status(500).json({ mensagem: error?.message || "Erro interno do servidor ao cancelar a nota fiscal." });
     }
   });
 
@@ -354,12 +380,12 @@ export function createApiApp() {
       let internalStatus = 'processando';
       let mensagem: string | null = null;
       if (p.status && p.status !== 'processando_autorizacao') {
-        const { data: nfe } = await supabase.from('notas_fiscais').select('pedido_id').eq('ref', ref).maybeSingle();
+        const { data: nfe } = await getSupabase().from('notas_fiscais').select('pedido_id').eq('ref', ref).maybeSingle();
         const r = await aplicarRetornoNfe(ref, nfe?.pedido_id || null, p);
         internalStatus = r.internalStatus;
         mensagem = r.updateData.mensagem_erro || null;
       }
-      const { data: nota } = await supabase.from('notas_fiscais').select('*').eq('ref', ref).maybeSingle();
+      const { data: nota } = await getSupabase().from('notas_fiscais').select('*').eq('ref', ref).maybeSingle();
       res.json({ status: internalStatus, mensagem, nfe: nota, focus_status: p.status });
     } catch (error: any) {
       const { mensagem, status } = extrairMensagemFocus(error);
@@ -379,7 +405,7 @@ export function createApiApp() {
     res.status(200).send("OK");
     try {
       if (!payload.ref) return;
-      const { data: nfe } = await supabase.from('notas_fiscais').select('pedido_id').eq('ref', payload.ref).maybeSingle();
+      const { data: nfe } = await getSupabase().from('notas_fiscais').select('pedido_id').eq('ref', payload.ref).maybeSingle();
       await aplicarRetornoNfe(payload.ref, nfe?.pedido_id || null, payload);
     } catch (err) {
       console.error("[FocusNFe] Erro no processamento do webhook:", err);
