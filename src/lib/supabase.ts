@@ -1,8 +1,13 @@
 /// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Injetados pelo vite.config.ts a partir de VITE_SUPABASE_URL ou SUPABASE_URL
+// (funciona com ou sem o prefixo público VITE_).
+declare const __SUPABASE_URL__: string;
+declare const __SUPABASE_ANON_KEY__: string;
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || __SUPABASE_URL__;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || __SUPABASE_ANON_KEY__;
 
 console.log("Iniciando Supabase com:", { 
   url: supabaseUrl ? `${supabaseUrl.substring(0, 10)}...` : "AUSENTE",
