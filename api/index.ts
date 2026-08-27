@@ -237,9 +237,11 @@ export function createApiApp() {
           unidade_tributavel: "UN",
           quantidade_tributavel: qty,
           valor_unitario_tributavel: unitPrice.toFixed(2),
-          origem_mercadoria: "0",
-          csosn: "400",
-          icms_situacao_tributaria: "400"
+          // Nomes corretos esperados pelo FocusNFe (antes: origem_mercadoria/csosn,
+          // que eram ignorados -> a origem ia vazia e a Sefaz rejeitava).
+          // Empresa é Simples Nacional -> usa CSOSN (não CST).
+          icms_origem: "0", // 0 = Nacional
+          icms_csosn: "400" // 400 = Não tributada pelo Simples Nacional
         };
       });
 
