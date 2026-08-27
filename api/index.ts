@@ -168,6 +168,48 @@ export function createApiApp() {
     });
   });
 
+  // Reconciliação: reconsulta na Focus todas as notas presas em "processando"
+  // e sincroniza o banco. Substitui, sob demanda, o job de background que só
+  // roda no servidor standalone (na Vercel serverless não há setInterval).
+  app.post("/api/nfe/reconcile", async (_req, res) => {
+    try {
+      if (!FOCUS_TOKEN) return res.status(500).json({ mensagem: "Token do FocusNFe não configurado." });
+      const { data: pendentes } = await getSupabase()
+        .from('notas_fiscais')
+        .select('*')
+        .eq('status', 'processando');
+
+      let atualizadas = 0;
+      for (const nfe of (pendentes || [])) {
+        try {
+          const p = await consultarNfe(nfe.ref);
+          if (p.status && p.status !== 'processando_autorizacao') {
+            await aplicarRetornoNfe(nfe.ref, nfe.pedido_id, p);
+            atualizadas++;
+          }
+        } catch (err: any) {
+          console.warn(`[FocusNFe] Reconcile falhou para ${nfe.ref}:`, err.message);
+        }
+      }
+      res.json({ ok: true, verificadas: (pendentes || []).length, atualizadas });
+    } catch (error: any) {
+      res.status(500).json({ mensagem: error?.message || "Erro ao reconciliar notas." });
+    }
+  });
+
+  // Diagnóstico: lista as notas fiscais (sem dados sensíveis) para depuração.
+  app.get("/api/nfe/debug", async (_req, res) => {
+    try {
+      const { data } = await getSupabase()
+        .from('notas_fiscais')
+        .select('id,pedido_id,ref,status,numero,serie,ambiente,mensagem_erro,created_at,updated_at')
+        .order('created_at', { ascending: false });
+      res.json({ total: data?.length || 0, notas: data || [] });
+    } catch (error: any) {
+      res.status(500).json({ mensagem: error?.message || "Erro ao consultar notas." });
+    }
+  });
+
   // Emissão de NF-e (Produto)
   app.post("/api/nfe/emit", async (req, res) => {
     try {

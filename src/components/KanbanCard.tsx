@@ -48,6 +48,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ order, onStatusChange, o
     if (nfeStatus === 'processando') return { label: 'Emitindo NF-e...', cls: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' };
     if (nfeStatus === 'erro') return { label: 'Falha na emissão', cls: 'bg-red-100 text-red-700', dot: 'bg-red-500' };
     if (nfeStatus === 'cancelado') return { label: 'Nota cancelada', cls: 'bg-zinc-200 text-zinc-600', dot: 'bg-zinc-400' };
+    // Fallback: pedido marcado como emitido, mas o registro da nota ainda não
+    // foi carregado/sincronizado — mostra "Nota emitida" mesmo assim.
+    if (order.nfeIssued) return { label: 'Nota emitida', cls: 'bg-green-100 text-green-700', dot: 'bg-green-500' };
     if (isNfeRequired && !order.nfeIssued) return { label: 'Pendente emissão', cls: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' };
     return null;
   })();
