@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { FileText, Search, ExternalLink, Download, Ban, RefreshCw, CheckCircle2, Clock, XCircle, Send } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FileText, Search, ExternalLink, Download, Ban, RefreshCw, CheckCircle2, Clock, XCircle, Send, RotateCw } from 'lucide-react';
 import { Order } from '../types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -8,6 +8,7 @@ interface NfeManagementProps {
   orders: Order[];
   notasFiscais: Record<string, any>;
   onOpenNfe: (order: Order) => void;
+  onReconcile?: () => Promise<void> | void;
 }
 
 const DEFAULT_UNIT_PRICE = 85;
@@ -28,9 +29,22 @@ const STATUS_META: Record<string, { label: string; cls: string; icon: React.Reac
   pendente: { label: 'Pendente emissão', cls: 'bg-amber-100 text-amber-700', icon: <Clock size={13} /> },
 };
 
-export const NfeManagement: React.FC<NfeManagementProps> = ({ orders, notasFiscais, onOpenNfe }) => {
+export const NfeManagement: React.FC<NfeManagementProps> = ({ orders, notasFiscais, onOpenNfe, onReconcile }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>('todas');
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    if (!onReconcile || syncing) return;
+    setSyncing(true);
+    try { await onReconcile(); } finally { setSyncing(false); }
+  };
+
+  // Ao abrir a tela, sincroniza automaticamente as notas com a Sefaz.
+  useEffect(() => {
+    handleSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Pedidos relevantes para NF-e: já têm nota, ou estão em acabamento/despacho.
   const rows = useMemo(() => {
@@ -38,7 +52,8 @@ export const NfeManagement: React.FC<NfeManagementProps> = ({ orders, notasFisca
       .filter((o) => notasFiscais[o.id] || o.status === 'finishing' || o.status === 'delivered')
       .map((o) => {
         const nfe = notasFiscais[o.id];
-        const status: string = nfe?.status || 'pendente';
+        // Fallback: pedido marcado como emitido, mas sem o registro carregado.
+        const status: string = nfe?.status || (o.nfeIssued ? 'autorizada' : 'pendente');
         return { order: o, nfe, status };
       });
 
@@ -72,7 +87,7 @@ export const NfeManagement: React.FC<NfeManagementProps> = ({ orders, notasFisca
     const all = orders.filter((o) => notasFiscais[o.id] || o.status === 'finishing' || o.status === 'delivered');
     return {
       total: all.length,
-      emitidas: all.filter((o) => notasFiscais[o.id]?.status === 'autorizada').length,
+      emitidas: all.filter((o) => notasFiscais[o.id]?.status === 'autorizada' || (!notasFiscais[o.id] && o.nfeIssued)).length,
       canceladas: all.filter((o) => notasFiscais[o.id]?.status === 'cancelado').length,
     };
   }, [orders, notasFiscais]);
@@ -97,7 +112,7 @@ export const NfeManagement: React.FC<NfeManagementProps> = ({ orders, notasFisca
             Acompanhe, reimprima e cancele as NF-e por pedido e cliente.
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
           <div className="bg-white border border-zinc-100 rounded-2xl px-4 py-2 text-center shadow-sm">
             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Emitidas</p>
             <p className="text-lg font-black text-green-600">{counts.emitidas}</p>
@@ -106,6 +121,17 @@ export const NfeManagement: React.FC<NfeManagementProps> = ({ orders, notasFisca
             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Canceladas</p>
             <p className="text-lg font-black text-zinc-500">{counts.canceladas}</p>
           </div>
+          {onReconcile && (
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              title="Atualizar status das notas junto à Sefaz"
+              className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-3 rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-all shadow-sm disabled:opacity-60"
+            >
+              <RotateCw size={16} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Atualizando...' : 'Atualizar'}
+            </button>
+          )}
         </div>
       </div>
 

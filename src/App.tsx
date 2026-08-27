@@ -196,6 +196,8 @@ const OrderBoard = () => {
       } finally {
         if (mounted) setLoading(false);
       }
+      // Sincroniza notas presas em "processando" logo após carregar (sem bloquear a UI).
+      handleReconcileNfes();
     };
     initData();
 
@@ -590,6 +592,19 @@ const handleDragEnd = (result: DropResult) => {
     }
   };
 
+  // Reconcilia notas presas em "processando" com a Sefaz (na Vercel serverless
+  // não há job de background) e recarrega os dados. Chamada no load e no botão
+  // "Atualizar" da tela de Notas Fiscais.
+  const handleReconcileNfes = async () => {
+    try {
+      await fetch('/api/nfe/reconcile', { method: 'POST' });
+    } catch (err) {
+      console.error('Erro ao reconciliar notas:', err);
+    } finally {
+      await Promise.all([fetchNotasFiscais(), fetchOrders()]);
+    }
+  };
+
   const handleCancelNfe = async (orderId: string, justificativa?: string) => {
     try {
       const response = await fetch('/api/nfe/cancel', {
@@ -955,6 +970,7 @@ const handleDragEnd = (result: DropResult) => {
           orders={orders}
           notasFiscais={notasFiscais}
           onOpenNfe={(o) => setNfeOrder(o)}
+          onReconcile={handleReconcileNfes}
         />
       )}
 
