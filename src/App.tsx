@@ -6,6 +6,7 @@ import { DashboardLayout } from './components/DashboardLayout';
 import { StatsOverview } from './components/StatsOverview';
 import { KanbanCard } from './components/KanbanCard';
 import { NfeModal } from './components/NfeModal';
+import { NfeManagement } from './components/NfeManagement';
 import { InventoryList } from './components/InventoryList';
 import { OrderForm } from './components/OrderForm';
 
@@ -141,7 +142,9 @@ const OrderBoard = () => {
   
   const fetchNotasFiscais = async () => {
     try {
-      const { data, error } = await supabase.from('notas_fiscais').select('*');
+      // Ordena ascendente para que, havendo mais de uma nota por pedido, a mais
+      // recente prevaleça no mapa (usado pelos cards e pela tela de Notas Fiscais).
+      const { data, error } = await supabase.from('notas_fiscais').select('*').order('created_at', { ascending: true });
       if (!error && data) {
         const nfMap = {};
         data.forEach(nf => {
@@ -945,6 +948,14 @@ const handleDragEnd = (result: DropResult) => {
 
       {activeTab === 'clients' && (
         <ClientManagement />
+      )}
+
+      {activeTab === 'nfe' && (
+        <NfeManagement
+          orders={orders}
+          notasFiscais={notasFiscais}
+          onOpenNfe={(o) => setNfeOrder(o)}
+        />
       )}
 
       {activeTab === 'inventory' && (
