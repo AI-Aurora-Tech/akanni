@@ -244,7 +244,18 @@ export function createApiApp() {
           // icms_origem preenche a origem da mercadoria (0 = Nacional).
           icms_origem: "0",
           icms_situacao_tributaria: "400",
-          icms_csosn: "400"
+          icms_csosn: "400",
+          // PIS/COFINS obrigatórios no XML. Para Simples Nacional sem tributação
+          // separada, usa-se CST "99" (outras operações) com base/alíquota/valor
+          // zerados (o recolhimento ocorre no DAS).
+          pis_situacao_tributaria: "99",
+          pis_base_calculo: "0.00",
+          pis_aliquota_porcentual: "0.00",
+          pis_valor: "0.00",
+          cofins_situacao_tributaria: "99",
+          cofins_base_calculo: "0.00",
+          cofins_aliquota_porcentual: "0.00",
+          cofins_valor: "0.00"
         };
       });
 
