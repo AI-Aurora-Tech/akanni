@@ -1,5 +1,6 @@
 import express from "express";
 import axios from "axios";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 
@@ -34,6 +35,33 @@ const HOMOLOG_DEST_NAME = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR F
 
 // Preço unitário de referência quando o item do pedido não tem valor definido.
 const DEFAULT_UNIT_PRICE = Number(process.env.FOCUS_NFE_PRECO_PADRAO || 85);
+
+// ===== Webhooks de SAÍDA (nosso sistema -> sistema externo) =====
+// Configure WEBHOOK_URL (destino) e, opcionalmente, WEBHOOK_OUTBOUND_SECRET
+// (assina o corpo com HMAC-SHA256 no header X-Akanni-Signature).
+const WEBHOOK_URL = process.env.WEBHOOK_URL?.trim();
+const WEBHOOK_SECRET_OUT = (process.env.WEBHOOK_OUTBOUND_SECRET || process.env.WEBHOOK_SECRET || '').trim();
+
+// Envia um evento para o WEBHOOK_URL. No-op se não configurado. Não lança:
+// captura o próprio erro para nunca quebrar o fluxo principal.
+async function dispararWebhook(evento: string, dados: any) {
+  if (!WEBHOOK_URL) return;
+  try {
+    const corpo = JSON.stringify({ evento, dados, enviado_em: new Date().toISOString() });
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Akanni-Event': evento,
+    };
+    if (WEBHOOK_SECRET_OUT) {
+      const assinatura = crypto.createHmac('sha256', WEBHOOK_SECRET_OUT).update(corpo).digest('hex');
+      headers['X-Akanni-Signature'] = `sha256=${assinatura}`;
+    }
+    await axios.post(WEBHOOK_URL, corpo, { headers, timeout: 5000 });
+    console.log(`[Webhook] Enviado: ${evento}`);
+  } catch (err: any) {
+    console.warn(`[Webhook] Falha ao enviar "${evento}":`, err?.message);
+  }
+}
 
 // Dados do emitente: SÓ enviados se explicitamente configurados por variável de
 // ambiente. Se nada for configurado, o FocusNFe usa a empresa vinculada ao TOKEN
@@ -93,11 +121,29 @@ const aplicarRetornoNfe = async (ref: string, pedidoId: string | null, p: any) =
       || "Erro na autorização junto à Sefaz.";
   }
 
+  // Status anterior (para só disparar o webhook quando realmente mudar).
+  const { data: anterior } = await getSupabase().from('notas_fiscais').select('status').eq('ref', ref).maybeSingle();
+
   await getSupabase().from('notas_fiscais').update(updateData).eq('ref', ref);
 
   if (pedidoId) {
     await getSupabase().from('orders').update({ nfe_issued: status === 'autorizado' }).eq('id', pedidoId);
   }
+
+  if (anterior?.status !== internalStatus) {
+    await dispararWebhook('nfe.status_alterado', {
+      pedido_id: pedidoId,
+      ref,
+      status: internalStatus,
+      numero: updateData.numero || null,
+      serie: updateData.serie || null,
+      chave_acesso: updateData.chave_acesso || null,
+      url_danfe: updateData.url_danfe || null,
+      url_xml: updateData.url_xml || null,
+      mensagem_erro: updateData.mensagem_erro || null,
+    });
+  }
+
   return { internalStatus, updateData };
 };
 
@@ -165,7 +211,42 @@ export function createApiApp() {
       supabase_url_configurada: !!SUPABASE_URL,
       supabase_key_configurada: !!SUPABASE_KEY,
       emitente_via_env: Object.keys(EMITENTE).length > 0,
+      webhook_saida_configurado: !!WEBHOOK_URL,
     });
+  });
+
+  // Mudança de status do pedido (dispara webhook de saída).
+  // O frontend chama este endpoint em vez de escrever direto no Supabase.
+  app.post("/api/orders/status", async (req, res) => {
+    try {
+      const { orderId, status } = req.body;
+      const validos = ['pending', 'cutting', 'sewing', 'finishing', 'delivered'];
+      if (!orderId || !validos.includes(status)) {
+        return res.status(400).json({ mensagem: "orderId e status válido são obrigatórios." });
+      }
+
+      const { data: pedido } = await getSupabase().from('orders').select('status, customer_name').eq('id', orderId).maybeSingle();
+      if (!pedido) return res.status(404).json({ mensagem: "Pedido não encontrado." });
+
+      const statusAnterior = pedido.status;
+      await getSupabase().from('orders')
+        .update({ status, status_started_at: new Date().toISOString() })
+        .eq('id', orderId);
+
+      if (statusAnterior !== status) {
+        await dispararWebhook('pedido.status_alterado', {
+          pedido_id: orderId,
+          cliente: pedido.customer_name,
+          status_anterior: statusAnterior,
+          status_novo: status,
+        });
+      }
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("[Orders] Erro ao mudar status:", error);
+      res.status(500).json({ mensagem: error?.message || "Erro ao atualizar o status do pedido." });
+    }
   });
 
   // Reconciliação: reconsulta na Focus todas as notas presas em "processando"
@@ -357,6 +438,7 @@ export function createApiApp() {
         console.error(`[FocusNFe] Erro na emissão (HTTP ${status}):`, JSON.stringify(focusError.response?.data || mensagem, null, 2));
 
         await getSupabase().from('notas_fiscais').update({ status: 'erro', mensagem_erro: mensagem, updated_at: new Date().toISOString() }).eq('ref', ref);
+        await dispararWebhook('nfe.status_alterado', { pedido_id: orderId, ref, status: 'erro', mensagem_erro: mensagem });
         return res.status(422).json({ status: 'erro', mensagem, erros, ref });
       }
 
@@ -428,6 +510,7 @@ export function createApiApp() {
         updated_at: new Date().toISOString(),
       }).eq('id', nfe.id);
       await getSupabase().from('orders').update({ nfe_issued: false }).eq('id', orderId);
+      await dispararWebhook('nfe.status_alterado', { pedido_id: orderId, ref: nfe.ref, status: 'cancelado', numero: nfe.numero || null });
       return res.status(200).json({ status: 'cancelado', mensagem: "Nota fiscal cancelada com sucesso." });
     } catch (error: any) {
       console.error("[FocusNFe] Erro interno no cancelamento:", error);
