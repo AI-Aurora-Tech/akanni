@@ -430,21 +430,22 @@ const OrderBoard = () => {
   
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     try {
-      const { error } = await supabase.from('orders').update({ 
-        status: newStatus,
-        status_started_at: new Date().toISOString()
-      }).eq('id', orderId);
-      
-      if (error) throw error;
+      // Passa pelo backend para persistir o status E disparar o webhook de saída
+      // (pedido.status_alterado). A emissão de NF-e NUNCA é automática.
+      const response = await fetch('/api/orders/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status: newStatus })
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.mensagem || 'Falha ao atualizar o status do pedido.');
+      }
       fetchOrders();
-
-      // A emissão de NF-e NUNCA é automática: é sempre feita manualmente pelo
-      // usuário através do fluxo de conferência (evita emitir notas incorretas,
-      // ainda mais em ambiente de homologação/teste).
-
     } catch (err: any) {
       console.error("Error changing status:", err);
       alert("Erro ao mudar status: " + (err.message || "Tente novamente."));
+      fetchOrders(); // ressincroniza a UI em caso de erro
     }
   };
 const handleDragEnd = (result: DropResult) => {
