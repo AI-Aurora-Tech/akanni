@@ -63,6 +63,37 @@ async function dispararWebhook(evento: string, dados: any) {
   }
 }
 
+// Rótulos legíveis (para o CRM/automação montar mensagens diretamente).
+const LABEL_PEDIDO: Record<string, string> = {
+  pending: 'Pendente', cutting: 'Corte', sewing: 'Costura', finishing: 'Acabamento', delivered: 'Despachado',
+};
+const LABEL_NFE: Record<string, string> = {
+  processando: 'Processando', autorizada: 'Nota emitida', erro: 'Falha na emissão', cancelado: 'Nota cancelada',
+};
+
+// Telefone só com dígitos e no formato E.164 do Brasil (55 + DDD + número).
+const telefoneE164 = (tel?: string | null) => {
+  const d = (tel || '').replace(/\D/g, '');
+  if (!d) return null;
+  return d.startsWith('55') ? d : `55${d}`;
+};
+
+// Monta os dados do cliente a partir de um pedido (para o CRM agir: WhatsApp, etc.).
+const clientePayload = (order: any) => ({
+  nome: order?.customer_name || null,
+  telefone: order?.customer_phone || null,
+  telefone_e164: telefoneE164(order?.customer_phone),
+  email: order?.customer_email || null,
+  documento: order?.customer_tax_id || null,
+});
+
+// Valor total do pedido (soma de quantidade x preço unitário dos itens).
+const valorTotalPedido = (order: any) => {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const total = items.reduce((acc: number, it: any) => acc + (Number(it.quantity) || 0) * (Number(it.unitPrice) || DEFAULT_UNIT_PRICE), 0);
+  return Number(total.toFixed(2));
+};
+
 // Dados do emitente: SÓ enviados se explicitamente configurados por variável de
 // ambiente. Se nada for configurado, o FocusNFe usa a empresa vinculada ao TOKEN
 // (a empresa Akanni que você cadastrou), evitando divergência de CNPJ.
@@ -131,16 +162,22 @@ const aplicarRetornoNfe = async (ref: string, pedidoId: string | null, p: any) =
   }
 
   if (anterior?.status !== internalStatus) {
+    const { data: pedido } = pedidoId
+      ? await getSupabase().from('orders').select('*').eq('id', pedidoId).maybeSingle()
+      : { data: null };
     await dispararWebhook('nfe.status_alterado', {
       pedido_id: pedidoId,
       ref,
       status: internalStatus,
+      status_label: LABEL_NFE[internalStatus] || internalStatus,
       numero: updateData.numero || null,
       serie: updateData.serie || null,
       chave_acesso: updateData.chave_acesso || null,
       url_danfe: updateData.url_danfe || null,
       url_xml: updateData.url_xml || null,
       mensagem_erro: updateData.mensagem_erro || null,
+      cliente: pedido ? clientePayload(pedido) : null,
+      valor_total: pedido ? valorTotalPedido(pedido) : null,
     });
   }
 
@@ -225,7 +262,7 @@ export function createApiApp() {
         return res.status(400).json({ mensagem: "orderId e status válido são obrigatórios." });
       }
 
-      const { data: pedido } = await getSupabase().from('orders').select('status, customer_name').eq('id', orderId).maybeSingle();
+      const { data: pedido } = await getSupabase().from('orders').select('*').eq('id', orderId).maybeSingle();
       if (!pedido) return res.status(404).json({ mensagem: "Pedido não encontrado." });
 
       const statusAnterior = pedido.status;
@@ -236,9 +273,13 @@ export function createApiApp() {
       if (statusAnterior !== status) {
         await dispararWebhook('pedido.status_alterado', {
           pedido_id: orderId,
-          cliente: pedido.customer_name,
+          cliente: clientePayload(pedido),
           status_anterior: statusAnterior,
+          status_anterior_label: LABEL_PEDIDO[statusAnterior] || statusAnterior,
           status_novo: status,
+          status_novo_label: LABEL_PEDIDO[status] || status,
+          data_entrega: pedido.delivery_date || null,
+          valor_total: valorTotalPedido(pedido),
         });
       }
 
@@ -438,7 +479,10 @@ export function createApiApp() {
         console.error(`[FocusNFe] Erro na emissão (HTTP ${status}):`, JSON.stringify(focusError.response?.data || mensagem, null, 2));
 
         await getSupabase().from('notas_fiscais').update({ status: 'erro', mensagem_erro: mensagem, updated_at: new Date().toISOString() }).eq('ref', ref);
-        await dispararWebhook('nfe.status_alterado', { pedido_id: orderId, ref, status: 'erro', mensagem_erro: mensagem });
+        await dispararWebhook('nfe.status_alterado', {
+          pedido_id: orderId, ref, status: 'erro', status_label: LABEL_NFE.erro,
+          mensagem_erro: mensagem, cliente: clientePayload(order), valor_total: valorTotalPedido(order),
+        });
         return res.status(422).json({ status: 'erro', mensagem, erros, ref });
       }
 
@@ -510,7 +554,12 @@ export function createApiApp() {
         updated_at: new Date().toISOString(),
       }).eq('id', nfe.id);
       await getSupabase().from('orders').update({ nfe_issued: false }).eq('id', orderId);
-      await dispararWebhook('nfe.status_alterado', { pedido_id: orderId, ref: nfe.ref, status: 'cancelado', numero: nfe.numero || null });
+      const { data: pedidoCancel } = await getSupabase().from('orders').select('*').eq('id', orderId).maybeSingle();
+      await dispararWebhook('nfe.status_alterado', {
+        pedido_id: orderId, ref: nfe.ref, status: 'cancelado', status_label: LABEL_NFE.cancelado,
+        numero: nfe.numero || null, cliente: pedidoCancel ? clientePayload(pedidoCancel) : null,
+        valor_total: pedidoCancel ? valorTotalPedido(pedidoCancel) : null,
+      });
       return res.status(200).json({ status: 'cancelado', mensagem: "Nota fiscal cancelada com sucesso." });
     } catch (error: any) {
       console.error("[FocusNFe] Erro interno no cancelamento:", error);
