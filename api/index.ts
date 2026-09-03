@@ -42,6 +42,10 @@ const DEFAULT_UNIT_PRICE = Number(process.env.FOCUS_NFE_PRECO_PADRAO || 85);
 const WEBHOOK_URL = process.env.WEBHOOK_URL?.trim();
 const WEBHOOK_SECRET_OUT = (process.env.WEBHOOK_OUTBOUND_SECRET || process.env.WEBHOOK_SECRET || '').trim();
 
+// Chave de API para a integração de ENTRADA (parceiros -> nosso sistema),
+// usada por sistemas externos (ex.: Data Crazy) para criar pedidos/clientes.
+const INTEGRATION_API_KEY = (process.env.INTEGRATION_API_KEY || '').trim();
+
 // Envia um evento para o WEBHOOK_URL. No-op se não configurado. Não lança:
 // captura o próprio erro para nunca quebrar o fluxo principal.
 async function dispararWebhook(evento: string, dados: any) {
@@ -249,7 +253,153 @@ export function createApiApp() {
       supabase_key_configurada: !!SUPABASE_KEY,
       emitente_via_env: Object.keys(EMITENTE).length > 0,
       webhook_saida_configurado: !!WEBHOOK_URL,
+      integracao_entrada_configurada: !!INTEGRATION_API_KEY,
     });
+  });
+
+  // ===== Integração de ENTRADA (parceiro -> nosso sistema) =====
+  // Valida a chave de API enviada no header X-API-Key.
+  const validarApiKey = (req: any, res: any): boolean => {
+    if (!INTEGRATION_API_KEY) {
+      res.status(500).json({ ok: false, erro: "Integração não configurada no servidor (defina INTEGRATION_API_KEY)." });
+      return false;
+    }
+    const enviado = (req.header('X-API-Key') || req.header('x-api-key') || '').trim();
+    if (enviado !== INTEGRATION_API_KEY) {
+      res.status(401).json({ ok: false, erro: "X-API-Key inválida ou ausente." });
+      return false;
+    }
+    return true;
+  };
+
+  // Teste de conectividade/autenticação para o parceiro.
+  app.get("/api/integracao/ping", (req, res) => {
+    if (!validarApiKey(req, res)) return;
+    res.json({ ok: true, mensagem: "Autenticado com sucesso.", ambiente: FOCUS_ENV });
+  });
+
+  // Recebe um pedido + dados do cliente e cria no sistema (cliente + pedido).
+  app.post("/api/integracao/pedidos", async (req, res) => {
+    if (!validarApiKey(req, res)) return;
+    try {
+      const { referencia_externa, cliente, itens, data_entrega, observacoes, status } = req.body || {};
+
+      if (!cliente || !cliente.nome || !String(cliente.nome).trim()) {
+        return res.status(400).json({ ok: false, erro: "cliente.nome é obrigatório." });
+      }
+      if (!Array.isArray(itens) || itens.length === 0) {
+        return res.status(400).json({ ok: false, erro: "itens deve ser uma lista com ao menos 1 item." });
+      }
+
+      const validos = ['pending', 'cutting', 'sewing', 'finishing', 'delivered'];
+      const statusPedido = validos.includes(status) ? status : 'pending';
+
+      // Idempotência: se a referência externa já existe, devolve o pedido existente.
+      if (referencia_externa) {
+        const { data: existente } = await getSupabase().from('orders').select('id, status').eq('external_ref', String(referencia_externa)).maybeSingle();
+        if (existente) {
+          return res.status(200).json({ ok: true, duplicado: true, pedido_id: existente.id, status: existente.status, mensagem: "Pedido já existente para esta referência externa." });
+        }
+      }
+
+      const end = cliente.endereco || {};
+      const enderecoStr = end.logradouro
+        ? `${end.logradouro}, ${end.numero || 'SN'}${end.complemento ? ', ' + end.complemento : ''}, ${end.bairro || ''}, ${end.cidade || ''}/${end.uf || ''} - CEP: ${end.cep || ''}`
+        : '';
+      const documento = cliente.documento ? String(cliente.documento).trim() : null;
+      const telefone = cliente.telefone ? String(cliente.telefone).trim() : null;
+      const nome = String(cliente.nome).trim();
+
+      // Upsert do cliente (por documento, depois por nome).
+      let clienteId: string | null = null;
+      try {
+        let cli: any = null;
+        if (documento) {
+          const { data } = await getSupabase().from('clients').select('id').eq('tax_id', documento).maybeSingle();
+          cli = data;
+        }
+        if (!cli) {
+          const { data } = await getSupabase().from('clients').select('id').eq('name', nome).maybeSingle();
+          cli = data;
+        }
+        if (cli) {
+          clienteId = cli.id;
+        } else {
+          const { data: novo } = await getSupabase().from('clients').insert({
+            name: nome,
+            tax_id: documento,
+            email: cliente.email || null,
+            phone: telefone,
+            address_cep: end.cep || null,
+            address_street: end.logradouro || null,
+            address_number: end.numero || null,
+            address_complement: end.complemento || null,
+            address_neighborhood: end.bairro || null,
+            address_city: end.cidade || null,
+            address_state: end.uf || null,
+            source: 'datacrazy',
+          }).select('id').single();
+          clienteId = novo?.id || null;
+        }
+      } catch (e: any) {
+        console.warn("[Integração] Falha ao upsert cliente:", e?.message);
+      }
+
+      // Mapeia os itens do parceiro para o formato interno do pedido.
+      const items = itens.map((it: any) => ({
+        templateId: '',
+        shirtType: it.descricao || it.produto || 'Produto',
+        quantity: Number(it.quantidade) || 1,
+        fabricType: it.tecido || '',
+        fabricColor: it.cor || '',
+        color: it.cor || '',
+        size: it.tamanho || '',
+        unitPrice: it.preco_unitario != null ? Number(it.preco_unitario) : DEFAULT_UNIT_PRICE,
+        fabricUsagePerUnit: 0,
+        totalFabricEstimate: 0,
+        observacao: it.observacao || undefined,
+      }));
+
+      const baseOrder: any = {
+        customer_name: nome,
+        customer_email: cliente.email || null,
+        customer_tax_id: documento,
+        customer_phone: telefone,
+        customer_address: enderecoStr,
+        items,
+        status: statusPedido,
+        status_started_at: new Date().toISOString(),
+        delivery_date: data_entrega || null,
+        is_delayed: false,
+        nfe_issued: false,
+      };
+      const fullOrder = { ...baseOrder, external_ref: referencia_externa ? String(referencia_externa) : null, notes: observacoes || null };
+
+      // Tenta inserir com external_ref/notes; se as colunas ainda não existem
+      // (migração não aplicada), reinsere sem elas para não travar a integração.
+      let pedido: any = null;
+      let insErr: any = null;
+      {
+        const r = await getSupabase().from('orders').insert(fullOrder).select('id, status').single();
+        pedido = r.data; insErr = r.error;
+      }
+      if (insErr && /external_ref|notes|column/i.test(insErr.message || '')) {
+        console.warn("[Integração] Colunas external_ref/notes ausentes — rode a migração. Inserindo sem elas.");
+        const r = await getSupabase().from('orders').insert(baseOrder).select('id, status').single();
+        pedido = r.data; insErr = r.error;
+      }
+      // Violação de unicidade (referência externa concorrente) -> devolve o existente.
+      if (insErr && /duplicate key|23505/i.test(insErr.message || '') && referencia_externa) {
+        const { data: existente } = await getSupabase().from('orders').select('id, status').eq('external_ref', String(referencia_externa)).maybeSingle();
+        if (existente) return res.status(200).json({ ok: true, duplicado: true, pedido_id: existente.id, status: existente.status });
+      }
+      if (insErr || !pedido) throw (insErr || new Error("Falha ao criar o pedido."));
+
+      return res.status(201).json({ ok: true, duplicado: false, pedido_id: pedido.id, cliente_id: clienteId, status: pedido.status });
+    } catch (error: any) {
+      console.error("[Integração] Erro ao criar pedido:", error);
+      return res.status(500).json({ ok: false, erro: error?.message || "Erro ao criar o pedido." });
+    }
   });
 
   // Mudança de status do pedido (dispara webhook de saída).
