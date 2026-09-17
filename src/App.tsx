@@ -17,6 +17,13 @@ import { motion, AnimatePresence } from 'motion/react';
 
 import { UserManagement } from './components/UserManagement';
 import { Settings } from './components/Settings';
+import { SupplierManagement } from './components/SupplierManagement';
+import { CarrierManagement } from './components/CarrierManagement';
+import { VariantsManager } from './components/VariantsManager';
+import { FixedExpenses } from './components/FixedExpenses';
+import { OutsourcingManager } from './components/OutsourcingManager';
+import { ReworkLog } from './components/ReworkLog';
+import { Construction } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult, DraggableProvided, DroppableProvided } from '@hello-pangea/dnd';
 import { STATUS_CONFIG } from './constants';
 
@@ -991,6 +998,23 @@ const handleDragEnd = (result: DropResult) => {
 
       {activeTab === 'settings' && (
         <Settings />
+      )}
+
+      {/* Fase A — Cadastros base */}
+      {activeTab === 'suppliers' && <SupplierManagement />}
+      {activeTab === 'carriers' && <CarrierManagement />}
+      {activeTab === 'variants' && <VariantsManager />}
+      {activeTab === 'outsourcing' && <OutsourcingManager />}
+      {activeTab === 'rework' && <ReworkLog />}
+      {activeTab === 'expenses' && <FixedExpenses />}
+
+      {/* Áreas em construção (próximas fases) */}
+      {['pipeline', 'pendencias', 'finance', 'goals', 'pricing', 'marketing', 'appsettings'].includes(activeTab) && (
+        <div className="max-w-md mx-auto mt-16 text-center bg-white rounded-3xl border border-dashed border-zinc-200 p-10">
+          <Construction size={44} className="mx-auto mb-4 text-amber-500" />
+          <h2 className="text-xl font-bold text-zinc-900">Em construção</h2>
+          <p className="text-zinc-500 text-sm mt-2">Esta área está sendo implementada nas próximas fases e chega em breve.</p>
+        </div>
       )}
 
       {/* Forms & Popups */}

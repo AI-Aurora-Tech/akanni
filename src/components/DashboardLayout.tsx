@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, Box, Users, Settings, LogOut, Menu, X, Bell, FileText } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Box, Users, Settings, LogOut, Menu, X, Bell, FileText, Factory, Truck, Tags, Wallet, Scissors, RefreshCcw, ChevronDown, Target, DollarSign, GitBranch, Megaphone, Calculator, ClipboardList, Ruler, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,6 +41,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
+  const [collapsedGroups, setCollapsedGroups] = React.useState<string[]>([]);
 
   const fetchNotifications = async () => {
     try {
@@ -163,20 +164,63 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
     return parts[0][0].toUpperCase();
   };
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Painel Geral', icon: <LayoutDashboard size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral'] },
-    { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
-    { id: 'clients', label: 'Clientes', icon: <Users size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
-    { id: 'nfe', label: 'Notas Fiscais', icon: <FileText size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral'] },
-    { id: 'templates', label: 'Modelos de Gasto', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
-    { id: 'inventory', label: 'Estoque de Tecidos', icon: <Box size={20} />, roles: ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'] },
-    { id: 'users', label: 'Usuários', icon: <Users size={20} />, roles: ['super_admin'] },
-    { id: 'settings', label: 'Minha Conta', icon: <Settings size={20} />, roles: ['super_admin', 'admin_geral', 'gerente_producao', 'gestor_geral', 'funcionario_padrao'] },
+  const ALL_ROLES = ['super_admin', 'admin_geral', 'gestor_geral', 'gerente_producao', 'funcionario_padrao'];
+  const GESTAO_ROLES = ['super_admin', 'admin_geral', 'gestor_geral'];
+
+  const menuGroups = [
+    {
+      title: 'Operação',
+      items: [
+        { id: 'dashboard', label: 'Painel Geral', icon: <LayoutDashboard size={20} />, roles: GESTAO_ROLES },
+        { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={20} />, roles: ALL_ROLES },
+        { id: 'pipeline', label: 'Pipeline', icon: <GitBranch size={20} />, roles: ALL_ROLES },
+        { id: 'pendencias', label: 'Pendências', icon: <Bell size={20} />, roles: ALL_ROLES },
+      ],
+    },
+    {
+      title: 'Fiscal',
+      items: [
+        { id: 'nfe', label: 'Notas Fiscais', icon: <FileText size={20} />, roles: GESTAO_ROLES },
+      ],
+    },
+    {
+      title: 'Cadastros',
+      items: [
+        { id: 'clients', label: 'Clientes', icon: <Users size={20} />, roles: ALL_ROLES },
+        { id: 'suppliers', label: 'Fornecedores', icon: <Factory size={20} />, roles: ALL_ROLES },
+        { id: 'carriers', label: 'Transportadoras', icon: <Truck size={20} />, roles: ALL_ROLES },
+        { id: 'variants', label: 'Produtos & Variantes', icon: <Tags size={20} />, roles: ALL_ROLES },
+        { id: 'templates', label: 'Modelos de Gasto', icon: <Box size={20} />, roles: ALL_ROLES },
+        { id: 'inventory', label: 'Estoque de Tecidos', icon: <Box size={20} />, roles: ALL_ROLES },
+        { id: 'outsourcing', label: 'Terceirização', icon: <Scissors size={20} />, roles: ALL_ROLES },
+        { id: 'rework', label: 'Retrabalho / Defeito', icon: <RefreshCcw size={20} />, roles: ALL_ROLES },
+      ],
+    },
+    {
+      title: 'Financeiro & Metas',
+      items: [
+        { id: 'finance', label: 'Financeiro / Vendas', icon: <DollarSign size={20} />, roles: GESTAO_ROLES },
+        { id: 'goals', label: 'Metas', icon: <Target size={20} />, roles: GESTAO_ROLES },
+        { id: 'expenses', label: 'Despesas Fixas', icon: <Wallet size={20} />, roles: GESTAO_ROLES },
+        { id: 'pricing', label: 'Precificação', icon: <Calculator size={20} />, roles: GESTAO_ROLES },
+      ],
+    },
+    {
+      title: 'Sistema',
+      items: [
+        { id: 'marketing', label: 'Marketing & Treinamentos', icon: <Megaphone size={20} />, roles: ALL_ROLES },
+        { id: 'users', label: 'Usuários', icon: <Users size={20} />, roles: ['super_admin'] },
+        { id: 'appsettings', label: 'Ajustes do Sistema', icon: <SlidersHorizontal size={20} />, roles: GESTAO_ROLES },
+        { id: 'settings', label: 'Minha Conta', icon: <Settings size={20} />, roles: ALL_ROLES },
+      ],
+    },
   ];
 
-  const filteredMenuItems = menuItems.filter(item => 
-    profile?.role === 'super_admin' || (item.roles as string[]).includes(profile?.role || '')
-  );
+  const canSee = (roles: string[]) => profile?.role === 'super_admin' || roles.includes(profile?.role || '');
+  const menuItems = menuGroups.flatMap(g => g.items);
+  const filteredGroups = menuGroups
+    .map(g => ({ ...g, items: g.items.filter(i => canSee(i.roles)) }))
+    .filter(g => g.items.length > 0);
 
   return (
     <div className="flex h-screen bg-zinc-50 overflow-hidden font-sans">
@@ -210,16 +254,34 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
           </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
-          {filteredMenuItems.map((item) => (
-            <SidebarItem
-              key={item.id}
-              icon={item.icon}
-              label={item.label}
-              active={activeTab === item.id}
-              onClick={() => setActiveTab(item.id)}
-            />
-          ))}
+        <nav className="flex-1 px-4 space-y-3 overflow-y-auto pb-4">
+          {filteredGroups.map((group) => {
+            const collapsed = collapsedGroups.includes(group.title);
+            return (
+              <div key={group.title}>
+                <button
+                  onClick={() => setCollapsedGroups(prev => prev.includes(group.title) ? prev.filter(t => t !== group.title) : [...prev, group.title])}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-zinc-600 transition-colors"
+                >
+                  <span>{group.title}</span>
+                  <ChevronDown size={14} className={`transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+                </button>
+                {!collapsed && (
+                  <div className="space-y-1 mt-1">
+                    {group.items.map((item) => (
+                      <SidebarItem
+                        key={item.id}
+                        icon={item.icon}
+                        label={item.label}
+                        active={activeTab === item.id}
+                        onClick={() => { setActiveTab(item.id); if (isMobile) setIsSidebarOpen(false); }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="p-4 border-t border-zinc-100">
