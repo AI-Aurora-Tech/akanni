@@ -173,8 +173,14 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
       items: [
         { id: 'dashboard', label: 'Painel Geral', icon: <LayoutDashboard size={20} />, roles: GESTAO_ROLES },
         { id: 'orders', label: 'Pedidos', icon: <ShoppingBag size={20} />, roles: ALL_ROLES },
-        { id: 'pipeline', label: 'Pipeline', icon: <GitBranch size={20} />, roles: ALL_ROLES },
         { id: 'pendencias', label: 'Pendências', icon: <Bell size={20} />, roles: ALL_ROLES },
+      ],
+    },
+    {
+      title: 'Produção',
+      items: [
+        { id: 'pipeline', label: 'Pipeline', icon: <GitBranch size={20} />, roles: ALL_ROLES },
+        { id: 'producaodocs', label: 'Romaneio & Ficha', icon: <ClipboardList size={20} />, roles: ALL_ROLES },
       ],
     },
     {

@@ -25,6 +25,8 @@ import { OutsourcingManager } from './components/OutsourcingManager';
 import { ReworkLog } from './components/ReworkLog';
 import { GoalsManager } from './components/GoalsManager';
 import { FinanceManagement } from './components/FinanceManagement';
+import { ProductionPipeline } from './components/ProductionPipeline';
+import { ProductionDocs } from './components/ProductionDocs';
 import { Construction } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult, DraggableProvided, DroppableProvided } from '@hello-pangea/dnd';
 import { STATUS_CONFIG } from './constants';
@@ -1014,8 +1016,12 @@ const handleDragEnd = (result: DropResult) => {
       {activeTab === 'finance' && <FinanceManagement />}
       {activeTab === 'goals' && <GoalsManager />}
 
+      {/* Fase C — Produção avançada */}
+      {activeTab === 'pipeline' && <ProductionPipeline />}
+      {activeTab === 'producaodocs' && <ProductionDocs />}
+
       {/* Áreas em construção (próximas fases) */}
-      {['pipeline', 'pendencias', 'pricing', 'marketing', 'appsettings'].includes(activeTab) && (
+      {['pendencias', 'pricing', 'marketing', 'appsettings'].includes(activeTab) && (
         <div className="max-w-md mx-auto mt-16 text-center bg-white rounded-3xl border border-dashed border-zinc-200 p-10">
           <Construction size={44} className="mx-auto mb-4 text-amber-500" />
           <h2 className="text-xl font-bold text-zinc-900">Em construção</h2>
