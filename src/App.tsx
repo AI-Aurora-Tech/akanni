@@ -25,7 +25,6 @@ import { OutsourcingManager } from './components/OutsourcingManager';
 import { ReworkLog } from './components/ReworkLog';
 import { GoalsManager } from './components/GoalsManager';
 import { FinanceManagement } from './components/FinanceManagement';
-import { ProductionPipeline } from './components/ProductionPipeline';
 import { ProductionDocs } from './components/ProductionDocs';
 import { Pendencias } from './components/Pendencias';
 import { CalculatorScreen } from './components/CalculatorScreen';
@@ -33,6 +32,8 @@ import { ProductionCosts } from './components/ProductionCosts';
 import { Pricing } from './components/Pricing';
 import { Marketing } from './components/Marketing';
 import { AppSettings } from './components/AppSettings';
+import { PublicClientRegister } from './components/public/PublicClientRegister';
+import { PublicOrderForm } from './components/public/PublicOrderForm';
 import { DragDropContext, Droppable, Draggable, DropResult, DraggableProvided, DroppableProvided } from '@hello-pangea/dnd';
 import { STATUS_CONFIG } from './constants';
 
@@ -1051,7 +1052,6 @@ const handleDragEnd = (result: DropResult) => {
       {activeTab === 'goals' && <GoalsManager />}
 
       {/* Fase C — Produção avançada */}
-      {activeTab === 'pipeline' && <ProductionPipeline />}
       {activeTab === 'producaodocs' && <ProductionDocs />}
 
       {/* Fase D — Gestão */}
@@ -1100,6 +1100,16 @@ const handleDragEnd = (result: DropResult) => {
 };
 
 export default function App() {
+  // Rotas PÚBLICAS (sem login), via hash: #/cadastro e #/pedido/<token>
+  const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+  if (hash === '/cadastro' || hash.startsWith('/cadastro')) {
+    return <PublicClientRegister />;
+  }
+  const pedidoMatch = hash.match(/^\/pedido\/([^/?#]+)/);
+  if (pedidoMatch) {
+    return <PublicOrderForm token={decodeURIComponent(pedidoMatch[1])} />;
+  }
+
   return (
     <AuthProvider>
       <OrderBoard />

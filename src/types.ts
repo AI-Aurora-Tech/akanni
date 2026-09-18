@@ -12,6 +12,7 @@ export interface Client {
   addressCity?: string;
   addressState?: string;
   source?: string;
+  publicToken?: string;
   createdAt: string;
 }
 

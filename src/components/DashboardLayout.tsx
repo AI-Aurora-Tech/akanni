@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingBag, Box, Users, Settings, LogOut, Menu, X, Bell, FileText, Factory, Truck, Tags, Wallet, Scissors, RefreshCcw, ChevronDown, Target, DollarSign, GitBranch, Megaphone, Calculator, ClipboardList, Ruler, SlidersHorizontal } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Box, Users, Settings, LogOut, Menu, X, Bell, FileText, Factory, Truck, Tags, Wallet, Scissors, RefreshCcw, ChevronDown, Target, DollarSign, Megaphone, Calculator, ClipboardList, Ruler, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -179,7 +179,6 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
     {
       title: 'Produção',
       items: [
-        { id: 'pipeline', label: 'Pipeline', icon: <GitBranch size={20} />, roles: ALL_ROLES },
         { id: 'producaodocs', label: 'Romaneio & Ficha', icon: <ClipboardList size={20} />, roles: ALL_ROLES },
       ],
     },

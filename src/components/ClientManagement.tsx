@@ -15,7 +15,9 @@ import {
   X,
   SearchIcon,
   MapPinned,
-  Loader2
+  Loader2,
+  Link2,
+  Copy
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Client } from '../types';
@@ -28,6 +30,19 @@ export const ClientManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isCepLoading, setIsCepLoading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyLink = (link: string, id: string) => {
+    try {
+      navigator.clipboard.writeText(link);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      window.prompt('Copie o link:', link);
+    }
+  };
+
+  const registerLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/#/cadastro`;
 
   const formatTaxId = (value: string) => {
     const val = value.replace(/\D/g, '');
@@ -98,6 +113,8 @@ export const ClientManagement = () => {
           addressNeighborhood: c.address_neighborhood,
           addressCity: c.address_city,
           addressState: c.address_state,
+          source: c.source,
+          publicToken: c.public_token,
           createdAt: c.created_at
         })));
       }
@@ -211,13 +228,23 @@ export const ClientManagement = () => {
           <h1 className="text-2xl font-bold text-zinc-900">Carteira de Clientes</h1>
           <p className="text-zinc-500 text-sm">Gerencie o cadastro de seus clientes para faturamento e produção.</p>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="flex items-center space-x-2 bg-zinc-900 text-white px-5 py-2.5 rounded-xl hover:bg-zinc-800 transition-colors shadow-sm"
-        >
-          <Plus size={18} />
-          <span>Novo Cliente</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => copyLink(registerLink, 'register')}
+            className="flex items-center space-x-2 bg-white border border-zinc-200 text-zinc-700 px-4 py-2.5 rounded-xl hover:bg-zinc-50 transition-colors shadow-sm"
+            title="Link público para o cliente se cadastrar sozinho"
+          >
+            <Link2 size={18} />
+            <span className="hidden sm:inline">{copiedId === 'register' ? 'Link copiado!' : 'Link de cadastro'}</span>
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center space-x-2 bg-zinc-900 text-white px-5 py-2.5 rounded-xl hover:bg-zinc-800 transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            <span>Novo Cliente</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex bg-white rounded-xl border border-zinc-200 px-5 py-2.5 focus-within:ring-2 focus-within:ring-zinc-900/10 transition-all max-w-md shadow-sm">
@@ -248,7 +275,16 @@ export const ClientManagement = () => {
               className="bg-white rounded-2xl border border-zinc-200 p-5 hover:shadow-lg hover:shadow-zinc-200/50 transition-all group relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2">
-                <button 
+                {client.publicToken && (
+                  <button
+                    onClick={() => copyLink(`${window.location.origin}/#/pedido/${client.publicToken}`, client.id)}
+                    className="p-2 bg-blue-50 rounded-lg text-blue-500 hover:text-blue-700 hover:bg-blue-100 transition-colors"
+                    title="Copiar link de pedido exclusivo deste cliente"
+                  >
+                    {copiedId === client.id ? <Copy size={16} className="text-emerald-600" /> : <Link2 size={16} />}
+                  </button>
+                )}
+                <button
                   onClick={() => handleOpenModal(client)}
                   className="p-2 bg-zinc-50 rounded-lg text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
                 >
