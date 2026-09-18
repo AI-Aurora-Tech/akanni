@@ -61,6 +61,22 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
     addressState: ''
   });
 
+  // Fase D — dados comerciais e de pagamento
+  const [commercial, setCommercial] = useState({
+    orderKind: (initialData?.orderKind || 'pedido') as 'orcamento' | 'pedido',
+    consultant: initialData?.consultant || '',
+    event: initialData?.event || '',
+    channel: initialData?.channel || '',
+    segment: initialData?.segment || '',
+    instagram: initialData?.instagram || '',
+    returnDate: initialData?.returnDate || '',
+    paymentTerms: initialData?.paymentTerms || '',
+    amountPaid: initialData?.amountPaid ?? 0,
+    deliveryFee: initialData?.deliveryFee ?? 0,
+    extraCost: initialData?.extraCost ?? 0,
+    negotiationNotes: initialData?.negotiationNotes || '',
+  });
+
   // When selecting a client, auto-fill
   useEffect(() => {
     if (selectedClientId && clientMode === 'select') {
@@ -206,6 +222,9 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
       finalCustomerInfo.customerAddress = addr.addressStreet ? `${addr.addressStreet}, ${addr.addressNumber}${addr.addressComplement ? ', ' + addr.addressComplement : ''}, ${addr.addressNeighborhood}, ${addr.addressCity}/${addr.addressState} - CEP: ${addr.addressCep}` : '';
     }
 
+    const totalValue = finalItems.reduce((acc, i) => acc + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0)
+      + (Number(commercial.deliveryFee) || 0) + (Number(commercial.extraCost) || 0);
+
     onSubmit({
       ...finalCustomerInfo,
       items: finalItems,
@@ -213,6 +232,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
       photos: initialData?.photos || [],
       isDelayed: initialData?.isDelayed || false,
       nfeIssued: initialData?.nfeIssued || false,
+      orderKind: commercial.orderKind,
+      consultant: commercial.consultant,
+      event: commercial.event,
+      channel: commercial.channel,
+      segment: commercial.segment,
+      instagram: commercial.instagram,
+      returnDate: commercial.returnDate || undefined,
+      paymentTerms: commercial.paymentTerms,
+      amountPaid: Number(commercial.amountPaid) || 0,
+      deliveryFee: Number(commercial.deliveryFee) || 0,
+      extraCost: Number(commercial.extraCost) || 0,
+      negotiationNotes: commercial.negotiationNotes,
+      totalValue,
     });
   };
 
@@ -609,6 +641,75 @@ export const OrderForm: React.FC<OrderFormProps> = ({ templates, stock, clients,
                 </AnimatePresence>
               </div>
             </div>
+          </div>
+
+          {/* Comercial & Pagamento (Fase D) */}
+          <div className="pt-6 border-t border-zinc-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Comercial & Pagamento</h3>
+              <div className="flex p-0.5 bg-zinc-100 rounded-lg text-xs font-bold">
+                <button type="button" onClick={() => setCommercial({ ...commercial, orderKind: 'orcamento' })} className={`px-3 py-1.5 rounded-md transition-all ${commercial.orderKind === 'orcamento' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500'}`}>Orçamento</button>
+                <button type="button" onClick={() => setCommercial({ ...commercial, orderKind: 'pedido' })} className={`px-3 py-1.5 rounded-md transition-all ${commercial.orderKind === 'pedido' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500'}`}>Pedido</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Consultor</label>
+                <input type="text" className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm" value={commercial.consultant} onChange={e => setCommercial({ ...commercial, consultant: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Evento</label>
+                <input type="text" placeholder="Ex: Formatura, SIPAT..." className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm" value={commercial.event} onChange={e => setCommercial({ ...commercial, event: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Canal de aquisição</label>
+                <input type="text" placeholder="De onde veio" className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm" value={commercial.channel} onChange={e => setCommercial({ ...commercial, channel: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Segmento (ramo)</label>
+                <input type="text" className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm" value={commercial.segment} onChange={e => setCommercial({ ...commercial, segment: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">@ do Instagram</label>
+                <input type="text" placeholder="@usuario" className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm" value={commercial.instagram} onChange={e => setCommercial({ ...commercial, instagram: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Cliente pediu retorno em</label>
+                <input type="date" className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm" value={commercial.returnDate} onChange={e => setCommercial({ ...commercial, returnDate: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Condição de pagamento</label>
+                <input type="text" placeholder="Ex: 50% na contratação" className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm" value={commercial.paymentTerms} onChange={e => setCommercial({ ...commercial, paymentTerms: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Valor já pago (R$)</label>
+                <input type="number" min={0} step="0.01" className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm font-mono" value={commercial.amountPaid || ''} onChange={e => setCommercial({ ...commercial, amountPaid: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Entrega (R$)</label>
+                  <input type="number" min={0} step="0.01" className="w-full px-3 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm font-mono" value={commercial.deliveryFee || ''} onChange={e => setCommercial({ ...commercial, deliveryFee: parseFloat(e.target.value) || 0 })} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Adicional (R$)</label>
+                  <input type="number" min={0} step="0.01" className="w-full px-3 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm font-mono" value={commercial.extraCost || ''} onChange={e => setCommercial({ ...commercial, extraCost: parseFloat(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1 ml-1 tracking-widest">Observação da negociação (interna)</label>
+                <textarea rows={2} className="w-full px-4 py-2.5 border border-zinc-200 rounded-xl outline-none focus:ring-2 focus:ring-zinc-900 text-sm resize-none" value={commercial.negotiationNotes} onChange={e => setCommercial({ ...commercial, negotiationNotes: e.target.value })} />
+              </div>
+            </div>
+            {(() => {
+              const total = calculateGrandTotalValue() + (Number(commercial.deliveryFee) || 0) + (Number(commercial.extraCost) || 0);
+              const restante = total - (Number(commercial.amountPaid) || 0);
+              return (
+                <div className="mt-4 flex flex-wrap gap-4 text-xs">
+                  <span className="px-3 py-1.5 bg-zinc-100 rounded-lg text-zinc-600">Total c/ entrega+adicional: <strong className="text-zinc-900 font-mono">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+                  <span className={`px-3 py-1.5 rounded-lg ${restante > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>Restante a pagar: <strong className="font-mono">R$ {restante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="pt-6 border-t border-zinc-100 flex flex-col md:flex-row items-center justify-between gap-4">

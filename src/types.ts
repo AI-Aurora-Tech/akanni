@@ -50,6 +50,20 @@ export interface Order {
   customerPhone?: string;
   isDelayed: boolean;
   nfeIssued: boolean;
+  // Campos comerciais / pagamento (Fase D)
+  orderKind?: 'orcamento' | 'pedido';
+  consultant?: string;
+  event?: string;
+  channel?: string;
+  segment?: string;
+  instagram?: string;
+  returnDate?: string;
+  totalValue?: number;
+  amountPaid?: number;
+  paymentTerms?: string;
+  deliveryFee?: number;
+  extraCost?: number;
+  negotiationNotes?: string;
 }
 
 export type StockType = 'fabric' | 'buttons' | 'collar' | 'thread' | 'label' | 'others';
