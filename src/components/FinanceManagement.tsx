@@ -309,7 +309,7 @@ const RelatoriosInner = () => {
               <button onClick={addTraffic} className="px-4 h-10 bg-zinc-900 text-white rounded-xl font-bold text-sm flex items-center gap-1"><Save size={15} /> Salvar</button>
             </div>
             {traffic.length === 0 ? <p className="text-sm text-zinc-400 italic">Nenhum canal cadastrado neste mês.</p> : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto"><table className="w-full text-sm min-w-[520px]">
                 <thead><tr className="text-zinc-400 text-left text-[11px] uppercase tracking-widest"><th className="py-2">Canal</th><th className="py-2 text-right">Gasto</th><th className="py-2 text-right">Receita</th><th className="py-2 text-right">ROI</th><th></th></tr></thead>
                 <tbody>
                   {traffic.map(t => {
@@ -326,7 +326,7 @@ const RelatoriosInner = () => {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
         </>

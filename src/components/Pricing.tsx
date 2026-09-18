@@ -180,8 +180,8 @@ export const Pricing = () => {
               {costs.length === 0 ? (
                 <p className="text-sm text-amber-700 bg-amber-50 rounded-xl p-3">Cadastre custos em <strong>Custos de Produção</strong> para ver os preços sugeridos por modelo.</p>
               ) : (
-                <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
-                  <table className="w-full text-sm">
+                <div className="bg-white rounded-2xl border border-zinc-200 overflow-x-auto shadow-sm">
+                  <table className="w-full text-sm min-w-[720px]">
                     <thead><tr className="bg-zinc-50 text-zinc-500 text-left text-[11px] uppercase tracking-widest">
                       <th className="px-5 py-3 font-bold">Modelo</th><th className="px-5 py-3 font-bold text-right">Custo material</th><th className="px-5 py-3 font-bold text-right">+ COP</th><th className="px-5 py-3 font-bold text-right">Custo real</th><th className="px-5 py-3 font-bold text-right">Preço p/ margem {margin}%</th><th className="px-5 py-3 font-bold text-right">Preço p/ markup {markup}%</th>
                     </tr></thead>

@@ -759,6 +759,147 @@ export function createApiApp() {
     }
   });
 
+  // ===== Páginas PÚBLICAS (autocadastro de cliente + pedido por link único) =====
+  // Servidas sem login. Usam a service role no backend (nunca expõem escrita
+  // direta no Supabase ao público).
+
+  // Catálogo para montar o pedido (produtos/variantes cadastrados).
+  app.get("/api/public/catalogo", async (_req, res) => {
+    try {
+      const { data } = await getSupabase().from('variant_options').select('category,value').order('value');
+      const grupos: Record<string, string[]> = {};
+      (data || []).forEach((r: any) => { (grupos[r.category] = grupos[r.category] || []).push(r.value); });
+      res.json({
+        ok: true,
+        produtos: grupos['produto'] || [],
+        tamanhos: grupos['tamanho'] || [],
+        golas: grupos['gola'] || [],
+        mangas: grupos['manga'] || [],
+        modelos_corte: grupos['modelo_corte'] || [],
+      });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, erro: e?.message || 'Erro ao carregar o catálogo.' });
+    }
+  });
+
+  // Autocadastro público de cliente. Devolve o token do link de pedido dele.
+  app.post("/api/public/clientes", async (req, res) => {
+    try {
+      const c = req.body || {};
+      const nome = String(c.nome || '').trim();
+      if (!nome) return res.status(400).json({ ok: false, erro: "Nome é obrigatório." });
+      const documento = c.documento ? String(c.documento).trim() : null;
+
+      let existing: any = null;
+      if (documento) {
+        const { data } = await getSupabase().from('clients').select('id, public_token').eq('tax_id', documento).maybeSingle();
+        existing = data;
+      }
+      if (!existing) {
+        const { data } = await getSupabase().from('clients').select('id, public_token').eq('name', nome).maybeSingle();
+        existing = data;
+      }
+
+      let token = existing?.public_token || null;
+      if (!existing) {
+        const ins = {
+          name: nome,
+          tax_id: documento,
+          email: c.email || null,
+          phone: c.telefone || null,
+          address_cep: c.cep || null,
+          address_street: c.logradouro || null,
+          address_number: c.numero || null,
+          address_neighborhood: c.bairro || null,
+          address_city: c.cidade || null,
+          address_state: c.uf || null,
+          source: 'autocadastro',
+        };
+        const r = await getSupabase().from('clients').insert(ins).select('id, public_token').single();
+        if (r.error) throw r.error;
+        token = r.data?.public_token || null;
+      } else if (!token) {
+        const novoToken = crypto.randomUUID();
+        await getSupabase().from('clients').update({ public_token: novoToken }).eq('id', existing.id);
+        token = novoToken;
+      }
+
+      res.status(201).json({ ok: true, order_token: token });
+    } catch (e: any) {
+      if (/public_token/i.test(e?.message || '')) {
+        return res.status(500).json({ ok: false, erro: "Rode a migração 007 no Supabase (coluna public_token em clients)." });
+      }
+      res.status(500).json({ ok: false, erro: e?.message || 'Erro ao cadastrar.' });
+    }
+  });
+
+  // Resolve o cliente pelo token (para saudar pelo nome e validar o link).
+  app.get("/api/public/cliente/:token", async (req, res) => {
+    try {
+      const { data } = await getSupabase().from('clients').select('name').eq('public_token', req.params.token).maybeSingle();
+      if (!data) return res.status(404).json({ ok: false, erro: "Link inválido ou expirado." });
+      res.json({ ok: true, nome: data.name });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, erro: e?.message || 'Erro ao validar o link.' });
+    }
+  });
+
+  // Cria um pedido a partir do link público, já vinculado ao cliente do token.
+  app.post("/api/public/pedidos", async (req, res) => {
+    try {
+      const { token, itens, observacoes } = req.body || {};
+      const { data: cli } = await getSupabase().from('clients').select('*').eq('public_token', token).maybeSingle();
+      if (!cli) return res.status(404).json({ ok: false, erro: "Link inválido ou expirado." });
+      if (!Array.isArray(itens) || itens.length === 0) {
+        return res.status(400).json({ ok: false, erro: "Selecione ao menos 1 produto." });
+      }
+
+      const items = itens.map((it: any) => ({
+        templateId: '',
+        shirtType: it.produto || 'Produto',
+        quantity: Number(it.quantidade) || 1,
+        fabricType: '',
+        fabricColor: it.cor || '',
+        color: it.cor || '',
+        size: it.tamanho || '',
+        collarType: it.gola || '',
+        unitPrice: 0,
+        fabricUsagePerUnit: 0,
+        totalFabricEstimate: 0,
+        observacao: it.observacao || undefined,
+      }));
+
+      const enderecoStr = cli.address_street
+        ? `${cli.address_street}, ${cli.address_number || 'SN'}, ${cli.address_neighborhood || ''}, ${cli.address_city || ''}/${cli.address_state || ''} - CEP: ${cli.address_cep || ''}`
+        : '';
+
+      const base: any = {
+        customer_name: cli.name,
+        customer_email: cli.email || null,
+        customer_tax_id: cli.tax_id || null,
+        customer_phone: cli.phone || null,
+        customer_address: enderecoStr,
+        items,
+        status: 'pending',
+        status_started_at: new Date().toISOString(),
+        delivery_date: null,
+        is_delayed: false,
+        nfe_issued: false,
+      };
+      const full = { ...base, channel: 'Link público', order_kind: 'pedido', notes: observacoes || null };
+
+      let r = await getSupabase().from('orders').insert(full).select('id').single();
+      if (r.error && /(column|schema cache|channel|order_kind|notes)/i.test(r.error.message || '')) {
+        r = await getSupabase().from('orders').insert(base).select('id').single();
+      }
+      if (r.error) throw r.error;
+
+      res.status(201).json({ ok: true, pedido_id: r.data?.id });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, erro: e?.message || 'Erro ao enviar o pedido.' });
+    }
+  });
+
   // 404 para rotas de API (evita cair no fallback da SPA)
   app.use("/api/*", (_req, res) => {
     res.status(404).json({ mensagem: "Endpoint não encontrado." });

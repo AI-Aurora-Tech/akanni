@@ -9,16 +9,18 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   setManualAuth: (user: User | null, profile: UserProfile | null) => void;
+  verifyPassword: (password: string) => Promise<boolean>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType>({ 
-  user: null, 
-  profile: null, 
-  loading: true, 
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  profile: null,
+  loading: true,
   isAdmin: false,
   setManualAuth: () => {},
-  logout: () => {} 
+  verifyPassword: async () => false,
+  logout: () => {}
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -30,6 +32,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(u);
     setProfile(p);
     setLoading(false);
+  };
+
+  // Verifica se a senha informada bate com a senha de login do usuário logado.
+  // Usada nas telas com trava de senha (Despesas Fixas, Relatórios Financeiros).
+  const verifyPassword = async (password: string): Promise<boolean> => {
+    const pw = (password || '').trim();
+    if (!pw || !profile) return false;
+
+    // Usuários mestre podem usar as senhas de administrador conhecidas.
+    const masterEmails = ['ai.auroratech@gmail.com', 'pedro_santos@akanni.com', 'pedrohenrique0806@gmail.com', 'pedro@akanni.com'];
+    const isMaster = profile.role === 'super_admin' || (profile.email && masterEmails.includes(profile.email));
+    if (isMaster && (pw === 'Admin123' || pw === 'adminakanni')) return true;
+
+    try {
+      const filtros: string[] = [];
+      if (profile.id) filtros.push(`id.eq."${profile.id}"`);
+      if (profile.email) filtros.push(`email.eq."${profile.email}"`);
+      if (profile.uid) filtros.push(`uid.eq."${profile.uid}"`);
+      if (filtros.length === 0) return false;
+      const { data } = await supabase.from('users').select('temp_password').or(filtros.join(',')).limit(1).maybeSingle();
+      if (data?.temp_password && pw === data.temp_password) return true;
+    } catch (err) {
+      console.warn('[Auth] verifyPassword falhou:', err);
+    }
+    return false;
   };
 
   const logout = async () => {
@@ -180,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loading, 
       isAdmin: profile?.role === 'super_admin' || profile?.role === 'admin_geral',
       setManualAuth,
+      verifyPassword,
       logout
     }}>
       {children}

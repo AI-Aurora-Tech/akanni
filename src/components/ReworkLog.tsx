@@ -146,8 +146,8 @@ export const ReworkLog = () => {
           <p className="text-sm font-medium">Nenhum retrabalho registrado.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-zinc-200 overflow-x-auto shadow-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-zinc-50 text-zinc-500 text-left text-[11px] uppercase tracking-widest">
                 <th className="px-5 py-3 font-bold">Data</th>
