@@ -198,6 +198,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
         { id: 'variants', label: 'Produtos & Variantes', icon: <Tags size={20} />, roles: ALL_ROLES },
         { id: 'templates', label: 'Modelos de Gasto', icon: <Box size={20} />, roles: ALL_ROLES },
         { id: 'inventory', label: 'Estoque de Tecidos', icon: <Box size={20} />, roles: ALL_ROLES },
+        { id: 'costs', label: 'Custos de Produção', icon: <Ruler size={20} />, roles: GESTAO_ROLES },
         { id: 'outsourcing', label: 'Terceirização', icon: <Scissors size={20} />, roles: ALL_ROLES },
         { id: 'rework', label: 'Retrabalho / Defeito', icon: <RefreshCcw size={20} />, roles: ALL_ROLES },
       ],
@@ -208,7 +209,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode, activeTab: s
         { id: 'finance', label: 'Financeiro / Vendas', icon: <DollarSign size={20} />, roles: GESTAO_ROLES },
         { id: 'goals', label: 'Metas', icon: <Target size={20} />, roles: GESTAO_ROLES },
         { id: 'expenses', label: 'Despesas Fixas', icon: <Wallet size={20} />, roles: GESTAO_ROLES },
-        { id: 'pricing', label: 'Precificação', icon: <Calculator size={20} />, roles: GESTAO_ROLES },
+        { id: 'calculator', label: 'Calculadora de Preço', icon: <Calculator size={20} />, roles: ALL_ROLES },
+        { id: 'pricing', label: 'Precificação', icon: <SlidersHorizontal size={20} />, roles: GESTAO_ROLES },
       ],
     },
     {

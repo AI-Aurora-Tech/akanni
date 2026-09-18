@@ -27,7 +27,12 @@ import { GoalsManager } from './components/GoalsManager';
 import { FinanceManagement } from './components/FinanceManagement';
 import { ProductionPipeline } from './components/ProductionPipeline';
 import { ProductionDocs } from './components/ProductionDocs';
-import { Construction } from 'lucide-react';
+import { Pendencias } from './components/Pendencias';
+import { CalculatorScreen } from './components/CalculatorScreen';
+import { ProductionCosts } from './components/ProductionCosts';
+import { Pricing } from './components/Pricing';
+import { Marketing } from './components/Marketing';
+import { AppSettings } from './components/AppSettings';
 import { DragDropContext, Droppable, Draggable, DropResult, DraggableProvided, DroppableProvided } from '@hello-pangea/dnd';
 import { STATUS_CONFIG } from './constants';
 
@@ -93,7 +98,20 @@ const OrderBoard = () => {
           updatedAt: o.updated_at,
           photos: Array.isArray(o.photos) ? o.photos : [],
           isDelayed: !!o.is_delayed,
-          nfeIssued: !!o.nfe_issued
+          nfeIssued: !!o.nfe_issued,
+          orderKind: o.order_kind || 'pedido',
+          consultant: o.consultant || '',
+          event: o.event || '',
+          channel: o.channel || '',
+          segment: o.segment || '',
+          instagram: o.instagram || '',
+          returnDate: o.return_date || '',
+          totalValue: Number(o.total_value) || 0,
+          amountPaid: Number(o.amount_paid) || 0,
+          paymentTerms: o.payment_terms || '',
+          deliveryFee: Number(o.delivery_fee) || 0,
+          extraCost: Number(o.extra_cost) || 0,
+          negotiationNotes: o.negotiation_notes || ''
         } as Order)));
       }
     } catch (err: any) {
@@ -541,8 +559,28 @@ const handleDragEnd = (result: DropResult) => {
         nfe_issued: !!orderData.nfeIssued
       };
 
+      // Campos comerciais/pagamento (Fase D). Se a migração 006 ainda não
+      // tiver sido rodada, o insert/update faz fallback sem essas colunas.
+      const commercialCols: any = {
+        order_kind: (orderData as any).orderKind || 'pedido',
+        consultant: (orderData as any).consultant || null,
+        event: (orderData as any).event || null,
+        channel: (orderData as any).channel || null,
+        segment: (orderData as any).segment || null,
+        instagram: (orderData as any).instagram || null,
+        return_date: (orderData as any).returnDate || null,
+        total_value: Number((orderData as any).totalValue) || 0,
+        amount_paid: Number((orderData as any).amountPaid) || 0,
+        payment_terms: (orderData as any).paymentTerms || null,
+        delivery_fee: Number((orderData as any).deliveryFee) || 0,
+        extra_cost: Number((orderData as any).extraCost) || 0,
+        negotiation_notes: (orderData as any).negotiationNotes || null,
+      };
+      const isMissingColumn = (err: any) => err && (err.code === 'PGRST204' || /column|schema cache/i.test(err.message || ''));
+
       if (editingOrder) {
-        const { error } = await supabase.from('orders').update(payload).eq('id', editingOrder.id);
+        let { error } = await supabase.from('orders').update({ ...payload, ...commercialCols }).eq('id', editingOrder.id);
+        if (isMissingColumn(error)) ({ error } = await supabase.from('orders').update(payload).eq('id', editingOrder.id));
         if (error) throw error;
         setEditingOrder(null);
         setIsOrderFormOpen(false);
@@ -550,15 +588,11 @@ const handleDragEnd = (result: DropResult) => {
         return;
       }
 
-      const { error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          ...payload,
-          status_started_at: new Date().toISOString()
-        });
+      let { error: orderError } = await supabase.from('orders').insert({ ...payload, ...commercialCols, status_started_at: new Date().toISOString() });
+      if (isMissingColumn(orderError)) ({ error: orderError } = await supabase.from('orders').insert({ ...payload, status_started_at: new Date().toISOString() }));
 
       if (orderError) throw orderError;
-      
+
       setIsOrderFormOpen(false);
       fetchOrders(); // Force refresh
     } catch (err: any) {
@@ -1020,14 +1054,13 @@ const handleDragEnd = (result: DropResult) => {
       {activeTab === 'pipeline' && <ProductionPipeline />}
       {activeTab === 'producaodocs' && <ProductionDocs />}
 
-      {/* Áreas em construção (próximas fases) */}
-      {['pendencias', 'pricing', 'marketing', 'appsettings'].includes(activeTab) && (
-        <div className="max-w-md mx-auto mt-16 text-center bg-white rounded-3xl border border-dashed border-zinc-200 p-10">
-          <Construction size={44} className="mx-auto mb-4 text-amber-500" />
-          <h2 className="text-xl font-bold text-zinc-900">Em construção</h2>
-          <p className="text-zinc-500 text-sm mt-2">Esta área está sendo implementada nas próximas fases e chega em breve.</p>
-        </div>
-      )}
+      {/* Fase D — Gestão */}
+      {activeTab === 'pendencias' && <Pendencias />}
+      {activeTab === 'calculator' && <CalculatorScreen />}
+      {activeTab === 'costs' && <ProductionCosts />}
+      {activeTab === 'pricing' && <Pricing />}
+      {activeTab === 'marketing' && <Marketing />}
+      {activeTab === 'appsettings' && <AppSettings />}
 
       {/* Forms & Popups */}
       {isOrderFormOpen && (
